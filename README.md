@@ -177,35 +177,6 @@ OCR 결과에서 전화번호, 이메일 등 개인정보 패턴을 탐지하고
 
 ---
 
-## Current Implementation Status
-
-현재 저장소에는 **백엔드 1차 MVP 구조**가 구현되어 있습니다.
-
-### Implemented
-- FastAPI 서버 구성
-- Health Check API
-- 이미지 업로드 및 로컬 저장
-- 습득물/분실물 등록 API
-- 등록 데이터 조회 API
-- SQLite + SQLAlchemy 기반 데이터 저장
-- 이미지 비교 API 구조
-- 검색 API 기본 구조
-- AI Embedding 연동을 위한 Mock 함수 및 인터페이스
-
-### In Progress / Planned
-- 실제 DINOv2 / CLIP / SigLIP Embedding 연동
-- 이미지 유사도 기반 실제 검색
-- 자연어 기반 검색
-- PostgreSQL + pgvector 전환
-- OCR 개인정보 탐지 및 마스킹
-- Vision-Language 기반 자동 정보 추출
-- 위치·시간 기반 Matching Score
-- Match Dashboard
-- Frontend 구현
-- Azure 배포 및 Blob Storage 연동
-
----
-
 ## Performance Goals
 
 | 항목 | 1차 목표 |
