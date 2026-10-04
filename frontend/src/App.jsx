@@ -204,17 +204,29 @@ function RegisterView({ onGoSearch }) {
         throw new Error(data.detail || "AI 분석 중 오류가 발생했습니다.");
       }
 
+      const extracted = {
+        category: (data.category || "").trim(),
+        color: (data.color || "").trim(),
+        brand: (data.brand || "").trim(),
+        description: (data.features || data.description || "").trim(),
+      };
+
+      const extractedCount = Object.values(extracted).filter(Boolean).length;
+      if (extractedCount === 0) {
+        throw new Error("AI 응답은 받았지만 자동 추출된 항목이 없습니다.");
+      }
+
       setForm((current) => ({
         ...current,
-        category: data.category || current.category,
-        color: data.color || current.color,
-        brand: data.brand || current.brand,
-        description: data.features || data.description || current.description,
+        category: extracted.category || current.category,
+        color: extracted.color || current.color,
+        brand: extracted.brand || current.brand,
+        description: extracted.description || current.description,
       }));
 
       setAnalysis({
         loading: false,
-        message: "AI 분석 결과를 자동 입력했습니다. 필요한 부분은 직접 수정할 수 있습니다.",
+        message: `AI가 ${extractedCount}개 항목을 자동 입력했습니다. 필요한 부분은 직접 수정할 수 있습니다.`,
         error: false,
       });
     } catch (error) {

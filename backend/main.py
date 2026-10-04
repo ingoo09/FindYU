@@ -125,23 +125,72 @@ def _load_vlm_model():
     return _vlm_processor, _vlm_model
 
 
-def _extract_json_object(text: str):
+def _extract_structured_fields(text: str):
     """
-    VLM 응답에서 JSON 객체를 최대한 안전하게 추출한다.
+    SmolVLM 출력에서 category/color/brand/features를 구조화한다.
+    1) JSON 우선 파싱
+    2) JSON이 아니면 'key: value' 형태를 fallback 파싱
     """
-    match = re.search(r"\{[\s\S]*\}", text)
-    if not match:
-        return {}
+    cleaned = (text or "").strip()
+    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s*```$", "", cleaned)
 
-    candidate = match.group(0)
-    try:
-        return json.loads(candidate)
-    except json.JSONDecodeError:
-        # 일부 소형 모델이 작은따옴표를 쓰는 경우를 최소한으로 보정한다.
-        try:
-            return json.loads(candidate.replace("'", '"'))
-        except json.JSONDecodeError:
-            return {}
+    data = {}
+
+    # 1) JSON 객체 우선
+    match = re.search(r"\{[\s\S]*?\}", cleaned)
+    if match:
+        candidate = match.group(0)
+        for value in (candidate, candidate.replace("'", '"')):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, dict):
+                    data.update(parsed)
+                    break
+            except json.JSONDecodeError:
+                continue
+
+    # 2) 소형 VLM이 JSON 대신 key: value 줄을 내놓는 경우 보정
+    aliases = {
+        "category": ["category", "item", "item_type", "object", "type", "물품", "물품 종류", "종류"],
+        "color": ["color", "colour", "main_color", "색상", "색"],
+        "brand": ["brand", "logo", "brand_logo", "브랜드", "로고"],
+        "features": [
+            "features",
+            "feature",
+            "description",
+            "distinctive_features",
+            "appearance",
+            "외형적 특징",
+            "특징",
+            "설명",
+        ],
+    }
+
+    if not all(str(data.get(key) or "").strip() for key in ("category", "color", "features")):
+        for canonical, names in aliases.items():
+            if str(data.get(canonical) or "").strip():
+                continue
+
+            alternatives = "|".join(re.escape(name) for name in sorted(names, key=len, reverse=True))
+            field_match = re.search(
+                rf"(?:^|\n)\s*(?:[-*]\s*)?(?:{alternatives})\s*[:：=-]\s*[\"']?([^\n\"']+)",
+                cleaned,
+                flags=re.IGNORECASE,
+            )
+            if field_match:
+                data[canonical] = field_match.group(1).strip(" ,.")
+
+    # alias key가 JSON 안에 들어온 경우 canonical key로 정규화
+    for canonical, names in aliases.items():
+        if str(data.get(canonical) or "").strip():
+            continue
+        for name in names:
+            if name in data and str(data.get(name) or "").strip():
+                data[canonical] = data[name]
+                break
+
+    return data
 
 
 def extract_item_info(image: Image.Image):
@@ -158,15 +207,16 @@ def extract_item_info(image: Image.Image):
     device = next(model.parameters()).device
 
     instruction = (
-        "Analyze the main lost-and-found item in this photo. "
-        "Return ONLY one valid JSON object with exactly these keys: "
-        "category, color, brand, features. "
-        "category: short item type. "
-        "color: main visible color. "
-        "brand: only a brand or logo that is actually visible or strongly recognizable; "
-        "use an empty string if unknown. "
-        "features: one short sentence describing distinctive exterior features, shape, marks, or accessories. "
-        "Do not invent hidden details. Prefer Korean values when possible; English is acceptable if needed."
+        "Identify the single main lost-and-found object in the photo. "
+        "Return ONLY valid JSON, with no markdown and no explanation. "
+        "Use exactly this schema: "
+        '{"category":"...","color":"...","brand":"...","features":"..."}. '
+        "category must be a short object type. "
+        "color must be the main visible color. "
+        "brand must contain a brand or logo only when it is visibly supported; otherwise use an empty string. "
+        "features must be a short description of visible shape, material, scratches, stickers, case, or other distinctive appearance. "
+        "Never invent details that are not visible. "
+        "Use concise Korean values when possible."
     )
 
     messages = [
@@ -197,20 +247,26 @@ def extract_item_info(image: Image.Image):
             do_sample=False,
         )
 
+    # 모델이 입력 prompt까지 함께 반환하므로, 실제 새로 생성된 token만 decode한다.
+    input_length = inputs["input_ids"].shape[-1]
+    generated_only = generated_ids[:, input_length:]
     generated_text = processor.batch_decode(
-        generated_ids,
+        generated_only,
         skip_special_tokens=True,
-    )[0]
+    )[0].strip()
 
-    data = _extract_json_object(generated_text)
+    data = _extract_structured_fields(generated_text)
 
-    return {
+    result = {
         "category": str(data.get("category") or "").strip(),
         "color": str(data.get("color") or "").strip(),
         "brand": str(data.get("brand") or "").strip(),
         "features": str(data.get("features") or "").strip(),
         "model": VLM_MODEL_NAME,
+        "_raw_output": generated_text,
     }
+
+    return result
 
 
 def cosine_similarity(vec1, vec2):
@@ -410,6 +466,15 @@ async def analyze_item_image(image: UploadFile = File(...)):
             status_code=500,
             detail=f"Vision-Language analysis failed: {exc}",
         ) from exc
+
+    if not any(result.get(key) for key in ("category", "color", "brand", "features")):
+        raw_preview = (result.get("_raw_output") or "")[:300]
+        raise HTTPException(
+            status_code=422,
+            detail=f"VLM 응답은 받았지만 등록 정보를 구조화하지 못했습니다. 원문: {raw_preview}",
+        )
+
+    result.pop("_raw_output", None)
 
     return {
         **result,
