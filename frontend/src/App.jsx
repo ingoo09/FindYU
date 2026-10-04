@@ -8,9 +8,9 @@ function apiUrl(path) {
 
 function assetUrl(path) {
   if (!path) return null;
-  if (/^https?:\\/\\//i.test(path)) return path;
+  if (/^https?:\/\//i.test(path)) return path;
 
-  if (/^https?:\\/\\//i.test(API_BASE)) {
+  if (/^https?:\/\//i.test(API_BASE)) {
     return new URL(path, API_BASE).toString();
   }
 
