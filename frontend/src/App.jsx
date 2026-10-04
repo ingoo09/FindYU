@@ -176,14 +176,54 @@ function RegisterView({ onGoSearch }) {
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [state, setState] = useState({ loading: false, message: "", error: false });
+  const [analysis, setAnalysis] = useState({ loading: false, message: "", error: false });
 
   function updateField(key, value) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function handleImage(file) {
+  async function handleImage(file) {
     setImage(file || null);
     setPreview(file ? URL.createObjectURL(file) : null);
+    setAnalysis({ loading: false, message: "", error: false });
+
+    if (!file) return;
+
+    const body = new FormData();
+    body.append("image", file);
+    setAnalysis({ loading: true, message: "AI가 사진을 분석하고 있습니다...", error: false });
+
+    try {
+      const response = await fetch(apiUrl("/items/analyze"), {
+        method: "POST",
+        body,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "AI 분석 중 오류가 발생했습니다.");
+      }
+
+      setForm((current) => ({
+        ...current,
+        category: data.category || current.category,
+        color: data.color || current.color,
+        brand: data.brand || current.brand,
+        description: data.features || data.description || current.description,
+      }));
+
+      setAnalysis({
+        loading: false,
+        message: "AI 분석 결과를 자동 입력했습니다. 필요한 부분은 직접 수정할 수 있습니다.",
+        error: false,
+      });
+    } catch (error) {
+      setAnalysis({
+        loading: false,
+        message: error.message,
+        error: true,
+      });
+    }
   }
 
   async function submit(event) {
@@ -231,8 +271,8 @@ function RegisterView({ onGoSearch }) {
         <span className="eyebrow">FOUND ITEM</span>
         <h1>습득물 간편 등록</h1>
         <p>
-          중간발표 MVP에서는 메타데이터를 직접 확인·입력합니다. Vision/VLM 자동 추출과 OCR 마스킹은
-          같은 입력 흐름에 연결할 예정입니다.
+          습득물 사진을 선택하면 Vision-Language 모델이 물품 종류, 색상, 브랜드/로고,
+          외형적 특징을 자동 추출합니다. 사용자는 자동 입력된 내용을 확인·수정한 뒤 등록합니다.
         </p>
       </div>
 
@@ -252,9 +292,18 @@ function RegisterView({ onGoSearch }) {
           </div>
 
           <div className="integration-note">
-            <strong>AI 연동 지점</strong>
-            <span>Vision/VLM 정보 추출 → OCR 개인정보 보호 → 사용자 확인/수정</span>
+            <strong>{analysis.loading ? "Vision/VLM 분석 중..." : "AI 자동 정보 추출"}</strong>
+            <span>
+              사진을 선택하면 물품 종류 · 색상 · 브랜드/로고 · 외형적 특징을 자동 분석하여
+              오른쪽 입력란에 채웁니다.
+            </span>
           </div>
+
+          {analysis.message ? (
+            <div className={`form-message ${analysis.error ? "error" : "success"}`}>
+              {analysis.message}
+            </div>
+          ) : null}
         </div>
 
         <div className="form-panel">

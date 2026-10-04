@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from PIL import Image
-from transformers import AutoImageProcessor, AutoModel
+from transformers import AutoImageProcessor, AutoModel, AutoProcessor, AutoModelForVision2Seq
 import torch
 import torch.nn.functional as F
 import io
@@ -54,6 +54,11 @@ _image_processor = None
 _image_model = None
 _model_lock = threading.Lock()
 
+VLM_MODEL_NAME = os.getenv("FINDYU_VLM_MODEL", "HuggingFaceTB/SmolVLM-500M-Instruct")
+_vlm_processor = None
+_vlm_model = None
+_vlm_lock = threading.Lock()
+
 
 def _load_image_model():
     """
@@ -86,6 +91,119 @@ def get_embedding(image: Image.Image):
         vector = F.normalize(vector, p=2, dim=1)
 
     return vector.squeeze(0).cpu().tolist()
+
+
+
+def _load_vlm_model():
+    """
+    습득물 사진에서 등록 정보를 자동 추출하기 위한 소형 Vision-Language 모델.
+    최초 분석 시 Hugging Face에서 모델 가중치를 내려받는다.
+    """
+    global _vlm_processor, _vlm_model
+
+    if _vlm_processor is None or _vlm_model is None:
+        with _vlm_lock:
+            if _vlm_processor is None or _vlm_model is None:
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                dtype = torch.bfloat16 if device == "cuda" else torch.float32
+
+                _vlm_processor = AutoProcessor.from_pretrained(VLM_MODEL_NAME)
+                _vlm_model = AutoModelForVision2Seq.from_pretrained(
+                    VLM_MODEL_NAME,
+                    torch_dtype=dtype,
+                    _attn_implementation="eager",
+                ).to(device)
+                _vlm_model.eval()
+
+    return _vlm_processor, _vlm_model
+
+
+def _extract_json_object(text: str):
+    """
+    VLM 응답에서 JSON 객체를 최대한 안전하게 추출한다.
+    """
+    match = re.search(r"\{[\s\S]*\}", text)
+    if not match:
+        return {}
+
+    candidate = match.group(0)
+    try:
+        return json.loads(candidate)
+    except json.JSONDecodeError:
+        # 일부 소형 모델이 작은따옴표를 쓰는 경우를 최소한으로 보정한다.
+        try:
+            return json.loads(candidate.replace("'", '"'))
+        except json.JSONDecodeError:
+            return {}
+
+
+def extract_item_info(image: Image.Image):
+    """
+    습득물 사진 1장에서 등록에 필요한 핵심 정보를 자동 추출한다.
+
+    반환:
+      category: 물품 종류
+      color: 대표 색상
+      brand: 사진에서 확인 가능한 브랜드/로고
+      features: 외형적 특징
+    """
+    processor, model = _load_vlm_model()
+    device = next(model.parameters()).device
+
+    instruction = (
+        "Analyze the main lost-and-found item in this photo. "
+        "Return ONLY one valid JSON object with exactly these keys: "
+        "category, color, brand, features. "
+        "category: short item type. "
+        "color: main visible color. "
+        "brand: only a brand or logo that is actually visible or strongly recognizable; "
+        "use an empty string if unknown. "
+        "features: one short sentence describing distinctive exterior features, shape, marks, or accessories. "
+        "Do not invent hidden details. Prefer Korean values when possible; English is acceptable if needed."
+    )
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image"},
+                {"type": "text", "text": instruction},
+            ],
+        }
+    ]
+
+    prompt = processor.apply_chat_template(messages, add_generation_prompt=True)
+    inputs = processor(
+        text=prompt,
+        images=[image.convert("RGB")],
+        return_tensors="pt",
+    )
+    inputs = {
+        key: value.to(device) if hasattr(value, "to") else value
+        for key, value in inputs.items()
+    }
+
+    with torch.inference_mode():
+        generated_ids = model.generate(
+            **inputs,
+            max_new_tokens=160,
+            do_sample=False,
+        )
+
+    generated_text = processor.batch_decode(
+        generated_ids,
+        skip_special_tokens=True,
+    )[0]
+
+    data = _extract_json_object(generated_text)
+
+    return {
+        "category": str(data.get("category") or "").strip(),
+        "color": str(data.get("color") or "").strip(),
+        "brand": str(data.get("brand") or "").strip(),
+        "features": str(data.get("features") or "").strip(),
+        "model": VLM_MODEL_NAME,
+    }
 
 
 def cosine_similarity(vec1, vec2):
@@ -237,6 +355,7 @@ def health_check():
         "status": "ok",
         "message": "FindYU backend is running",
         "image_embedding_model": MODEL_NAME,
+        "registration_vlm_model": VLM_MODEL_NAME,
     }
 
 
@@ -259,6 +378,35 @@ async def compare_images(
         "similarity": round(similarity, 4),
         "is_same_item": similarity >= 0.8,
         "scoring_mode": "dinov2+metadata",
+    }
+
+
+@app.post("/items/analyze")
+async def analyze_item_image(image: UploadFile = File(...)):
+    """
+    습득물 사진을 등록하기 전에 VLM으로 종류/색상/브랜드/외형적 특징을 추출한다.
+    프론트엔드는 이 결과를 입력란에 자동 채우고, 사용자가 수정한 뒤 POST /items로 확정 등록한다.
+    """
+    image_bytes = await image.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="image is required")
+
+    try:
+        pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="invalid image file") from exc
+
+    try:
+        result = extract_item_info(pil_image)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Vision-Language analysis failed: {exc}",
+        ) from exc
+
+    return {
+        **result,
+        "description": result["features"],
     }
 
 

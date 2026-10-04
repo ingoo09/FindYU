@@ -12,7 +12,7 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-첫 실행 시 `facebook/dinov2-small` 모델 가중치를 내려받을 수 있습니다.
+첫 이미지 검색/등록 시 `facebook/dinov2-small`, 첫 자동 정보 추출 시 `HuggingFaceTB/SmolVLM-500M-Instruct` 모델 가중치를 내려받을 수 있습니다.
 
 ### Frontend
 
@@ -25,6 +25,15 @@ npm run dev
 브라우저: http://localhost:5173
 
 ## API 연동
+
+### POST /items/analyze
+
+습득물 사진을 먼저 Vision-Language 모델로 분석합니다.
+
+- 입력: `image`
+- 출력: `category`, `color`, `brand`, `features`
+- 모델: `HuggingFaceTB/SmolVLM-500M-Instruct`
+- 프론트엔드는 분석 결과를 등록 입력란에 자동 채우며 사용자가 수정할 수 있습니다.
 
 ### POST /items
 

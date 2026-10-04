@@ -4,4 +4,4 @@ python-multipart
 pillow
 sqlalchemy
 torch
-transformers
+transformers>=4.49.0
