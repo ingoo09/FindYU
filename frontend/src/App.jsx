@@ -130,7 +130,7 @@ function MatchDashboard({ candidate, onClose }) {
           <span className="eyebrow">MATCHING SCORE</span>
           <strong>{scoreLabel(candidate.matching_score)}</strong>
           <span>
-            이미지 유사도는 DINOv2 Embedding을 사용하며, 텍스트·위치·시간 점수를 함께 반영합니다.
+            이미지 유사도는 DINOv2, 자연어-이미지 유사도는 SigLIP2를 사용하며 위치·시간 점수를 함께 반영합니다.
           </span>
         </div>
       </div>
@@ -538,7 +538,7 @@ function SearchView() {
               <span className="eyebrow">TOP-5 RESULTS</span>
               <h2>유사 습득물 후보</h2>
             </div>
-            <span className="demo-badge">DINOv2 + metadata ranking</span>
+            <span className="demo-badge">DINOv2 + SigLIP2 + metadata</span>
           </div>
 
           <div className="candidate-grid">

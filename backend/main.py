@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from PIL import Image
-from transformers import AutoImageProcessor, AutoModel, AutoProcessor
+from transformers import AutoProcessor
 
 try:
     # Transformers 5.x / current SmolVLM API
@@ -36,6 +36,8 @@ import uuid
 
 from database import engine, Base, get_db, SessionLocal
 import models
+from ai_retrieval import RetrievalModelManager, cosine_similarity_01
+from search_graph import run_search_graph
 
 logger = logging.getLogger("findyu")
 
@@ -58,51 +60,70 @@ Base.metadata.create_all(bind=engine)
 
 
 # ---------------------------------------------------------
-# 실제 DINOv2 이미지 임베딩
+# AI branch retrieval models
 # ---------------------------------------------------------
 MODEL_NAME = os.getenv("FINDYU_IMAGE_MODEL", "facebook/dinov2-small")
-_image_processor = None
-_image_model = None
-_model_lock = threading.Lock()
+TEXT_IMAGE_MODEL_NAME = os.getenv(
+    "FINDYU_TEXT_IMAGE_MODEL",
+    "google/siglip2-base-patch16-224",
+)
 
-VLM_MODEL_NAME = os.getenv("FINDYU_VLM_MODEL", "HuggingFaceTB/SmolVLM-500M-Instruct")
+_retrieval_models = RetrievalModelManager(
+    image_model_name=MODEL_NAME,
+    text_image_model_name=TEXT_IMAGE_MODEL_NAME,
+)
+
+VLM_MODEL_NAME = os.getenv(
+    "FINDYU_VLM_MODEL",
+    "HuggingFaceTB/SmolVLM-500M-Instruct",
+)
 _vlm_processor = None
 _vlm_model = None
 _vlm_lock = threading.Lock()
 
-
-def _load_image_model():
-    """
-    DINOv2 processor/model을 최초 호출 시 한 번만 로드한다.
-    첫 실행에서는 Hugging Face에서 모델 가중치를 내려받을 수 있다.
-    """
-    global _image_processor, _image_model
-
-    if _image_processor is None or _image_model is None:
-        with _model_lock:
-            if _image_processor is None or _image_model is None:
-                _image_processor = AutoImageProcessor.from_pretrained(MODEL_NAME)
-                _image_model = AutoModel.from_pretrained(MODEL_NAME)
-                _image_model.eval()
-
-    return _image_processor, _image_model
+# candidate SigLIP image embedding cache: {image_path: (mtime, embedding)}
+_siglip_image_cache = {}
+_siglip_cache_lock = threading.Lock()
 
 
 def get_embedding(image: Image.Image):
-    """
-    PIL 이미지를 DINOv2 CLS embedding으로 변환한다.
-    반환 벡터는 L2 normalize하여 cosine similarity에 바로 사용할 수 있다.
-    """
-    processor, model = _load_image_model()
-    inputs = processor(images=image.convert("RGB"), return_tensors="pt")
+    """AI branch의 DINOv2 image embedding을 현재 PIL 기반 API에 맞게 사용."""
+    return _retrieval_models.dino_image(image)
 
-    with torch.inference_mode():
-        outputs = model(**inputs)
-        vector = outputs.last_hidden_state[:, 0, :]
-        vector = F.normalize(vector, p=2, dim=1)
 
-    return vector.squeeze(0).cpu().tolist()
+def get_text_embedding(text: str):
+    """AI branch의 SigLIP2 text embedding."""
+    if not text or not text.strip():
+        return None
+    return _retrieval_models.siglip_text(text.strip())
 
+
+def get_siglip_image_embedding(item):
+    """등록 이미지의 SigLIP2 embedding을 메모리 캐시와 함께 반환."""
+    if not item.image_path or not os.path.exists(item.image_path):
+        return []
+
+    try:
+        mtime = os.path.getmtime(item.image_path)
+    except OSError:
+        return []
+
+    with _siglip_cache_lock:
+        cached = _siglip_image_cache.get(item.image_path)
+        if cached and cached[0] == mtime:
+            return cached[1]
+
+    try:
+        with Image.open(item.image_path) as image:
+            vector = _retrieval_models.siglip_image(image.convert("RGB"))
+    except Exception:
+        logger.exception("SigLIP2 candidate embedding 실패: %s", item.image_path)
+        return []
+
+    with _siglip_cache_lock:
+        _siglip_image_cache[item.image_path] = (mtime, vector)
+
+    return vector
 
 
 def _load_vlm_model():
@@ -596,8 +617,7 @@ def item_embedding(item):
     현재 DINOv2 차원과 일치하는 저장 임베딩은 그대로 사용한다.
     과거 mock/fallback 임베딩은 이미지 파일에서 DINOv2로 다시 계산한다.
     """
-    _, model = _load_image_model()
-    expected_size = int(model.config.hidden_size)
+    expected_size = _retrieval_models.dino_dimension()
 
     try:
         stored = json.loads(item.embedding) if item.embedding else None
@@ -712,7 +732,9 @@ def health_check():
         "status": "ok",
         "message": "FindYU backend is running",
         "image_embedding_model": MODEL_NAME,
+        "text_image_embedding_model": TEXT_IMAGE_MODEL_NAME,
         "registration_vlm_model": VLM_MODEL_NAME,
+        "search_workflow": "LangGraph",
     }
 
 
@@ -729,7 +751,7 @@ async def compare_images(
 
     emb1 = get_embedding(img1)
     emb2 = get_embedding(img2)
-    similarity = cosine_similarity(emb1, emb2)
+    similarity = cosine_similarity_01(emb1, emb2)
 
     return {
         "similarity": round(similarity, 4),
@@ -847,10 +869,16 @@ async def search_items(
     top_k: int = Form(5),
     db: Session = Depends(get_db),
 ):
-    if top_k < 1:
-        top_k = 1
-    if top_k > 20:
-        top_k = 20
+    """
+    AI 브랜치의 핵심 검색 구조를 demo FastAPI/SQLite에 통합.
+
+    - Image -> Image: DINOv2
+    - Text -> Image: SigLIP2
+    - Location/Time: metadata score
+    - Orchestration: LangGraph
+    - Ranking weights: AI branch 0.45 / 0.25 / 0.20 / 0.10
+    """
+    top_k = max(1, min(int(top_k), 20))
 
     query_image_embedding = None
     if image is not None and image.filename:
@@ -862,74 +890,58 @@ async def search_items(
             except Exception as exc:
                 raise HTTPException(status_code=400, detail="invalid search image") from exc
 
+    try:
+        query_text_embedding = get_text_embedding(description) if description else None
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"SigLIP2 text embedding failed: {exc}",
+        ) from exc
+
     query_time = parse_optional_datetime(occurred_at)
 
     candidates = (
         db.query(models.Item)
         .filter(models.Item.item_type == "found")
+        .filter(models.Item.status != STATUS_ANALYSIS_FAILED)
         .all()
     )
 
-    results = []
+    def candidate_image_score(item, query_vector):
+        candidate_vector = item_embedding(item)
+        return cosine_similarity_01(query_vector, candidate_vector)
 
-    for candidate in candidates:
-        image_score = None
-        if query_image_embedding is not None:
-            candidate_embedding = item_embedding(candidate)
-            image_score = cosine_similarity(query_image_embedding, candidate_embedding)
+    def candidate_text_score(item, query_vector):
+        candidate_vector = get_siglip_image_embedding(item)
+        return cosine_similarity_01(query_vector, candidate_vector)
 
-        candidate_text = " ".join(
-            value
-            for value in [
-                candidate.category,
-                candidate.color,
-                candidate.brand,
-                candidate.description,
-            ]
-            if value
-        )
-        text_score = text_similarity(description, candidate_text)
-        location_score = location_similarity(location, candidate.location)
-        time_score = time_similarity(query_time, candidate.occurred_at)
-
-        weighted_components = []
-        if image_score is not None:
-            weighted_components.append((0.45, image_score))
-        if text_score is not None:
-            weighted_components.append((0.30, text_score))
-        if location_score is not None:
-            weighted_components.append((0.15, location_score))
-        if time_score is not None:
-            weighted_components.append((0.10, time_score))
-
-        if weighted_components:
-            total_weight = sum(weight for weight, _ in weighted_components)
-            matching_score = sum(
-                weight * score for weight, score in weighted_components
-            ) / total_weight
-        else:
-            matching_score = 0.0
-
-        results.append(
-            {
-                **serialize_item(candidate),
-                "image_similarity": round(image_score, 4) if image_score is not None else None,
-                "text_similarity": round(text_score, 4) if text_score is not None else None,
-                "location_score": round(location_score, 4) if location_score is not None else None,
-                "time_score": round(time_score, 4) if time_score is not None else None,
-                "matching_score": round(matching_score, 4),
-                "similarity": round(matching_score, 4),
-                "scoring_mode": "dinov2+metadata",
-            }
-        )
-
-    results.sort(key=lambda item: item["matching_score"], reverse=True)
+    graph_result = run_search_graph(
+        candidates=candidates,
+        query_image_embedding=query_image_embedding,
+        query_text_embedding=query_text_embedding,
+        get_candidate_image_embedding=candidate_image_score,
+        get_candidate_text_image_embedding=candidate_text_score,
+        location_score_fn=location_similarity,
+        time_score_fn=time_similarity,
+        serialize_fn=serialize_item,
+        query_location=location,
+        query_time=query_time,
+        top_k=top_k,
+        weights={
+            "image": 0.45,
+            "text": 0.25,
+            "location": 0.20,
+            "time": 0.10,
+        },
+    )
 
     return {
         "query_description": description,
         "query_location": location,
         "query_occurred_at": occurred_at,
-        "scoring_mode": "dinov2+metadata",
+        "scoring_mode": "dinov2+siglip2+metadata+langgraph",
+        "image_model": MODEL_NAME,
+        "text_image_model": TEXT_IMAGE_MODEL_NAME,
         "total_candidates": len(candidates),
-        "results": results[:top_k],
+        "results": graph_result.get("results", []),
     }

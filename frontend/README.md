@@ -62,8 +62,8 @@ Vite 개발 서버가 해당 경로를 Backend로 proxy하므로 Top-5 후보 �
 ## 현재 검색 점수
 
 - 이미지: DINOv2 (`facebook/dinov2-small`) embedding cosine similarity
-- 텍스트: 중간발표용 문자열/토큰 기반 점수
+- 텍스트→이미지: SigLIP2 (`google/siglip2-base-patch16-224`) embedding cosine similarity
 - 위치: 문자열 유사도
 - 시간: 시간 차이 기반 점수
 
-텍스트 부분은 이후 SigLIP/CLIP 계열 멀티모달 embedding으로 교체할 수 있습니다.
+검색 흐름은 AI 브랜치의 DINOv2 + SigLIP2 + metadata 가중 랭킹 구조를 LangGraph로 연결합니다.
