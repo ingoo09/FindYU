@@ -3,3 +3,5 @@ uvicorn[standard]
 python-multipart
 pillow
 sqlalchemy
+torch
+transformers
