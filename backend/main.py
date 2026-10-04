@@ -15,7 +15,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from PIL import Image
-from transformers import AutoImageProcessor, AutoModel, AutoProcessor, AutoModelForVision2Seq
+from transformers import AutoImageProcessor, AutoModel, AutoProcessor
+
+try:
+    # Transformers 5.x / current SmolVLM API
+    from transformers import AutoModelForImageTextToText as AutoVLMModel
+except ImportError:
+    # Compatibility with older Transformers releases
+    from transformers import AutoModelForVision2Seq as AutoVLMModel
 import torch
 import torch.nn.functional as F
 import io
@@ -108,7 +115,7 @@ def _load_vlm_model():
                 dtype = torch.bfloat16 if device == "cuda" else torch.float32
 
                 _vlm_processor = AutoProcessor.from_pretrained(VLM_MODEL_NAME)
-                _vlm_model = AutoModelForVision2Seq.from_pretrained(
+                _vlm_model = AutoVLMModel.from_pretrained(
                     VLM_MODEL_NAME,
                     torch_dtype=dtype,
                     _attn_implementation="eager",
