@@ -1,0 +1,8 @@
+torch
+transformers
+accelerate
+pillow
+faiss-cpu
+pandas
+numpy
+langgraph
