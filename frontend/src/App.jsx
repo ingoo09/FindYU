@@ -164,6 +164,37 @@ function MatchDashboard({ candidate, onClose }) {
   );
 }
 
+function RegisteredItemStatus({ item }) {
+  if (item.status === "analyzing") {
+    return (
+      <div className="form-message success">
+        습득물 #{item.id}: AI가 사진을 분석하고 있습니다. 페이지를 나가도 분석이 끝나면 자동으로 등록됩니다.
+      </div>
+    );
+  }
+
+  if (item.status === "analysis_failed") {
+    return (
+      <div className="form-message error">
+        습득물 #{item.id}은 등록되었지만 AI 자동 분석에 실패했습니다. 사진 검색은 그대로 가능합니다.
+      </div>
+    );
+  }
+
+  const filled = [
+    ["종류", item.category],
+    ["색상", item.color],
+    ["브랜드", item.brand],
+    ["특징", item.description],
+  ].filter(([, value]) => value);
+
+  return (
+    <div className="form-message success">
+      습득물 #{item.id} AI 분석 완료: {filled.map(([label, value]) => `${label} ${value}`).join(" · ")}
+    </div>
+  );
+}
+
 function RegisterView({ onGoSearch }) {
   const [form, setForm] = useState({
     category: "",
@@ -176,66 +207,34 @@ function RegisterView({ onGoSearch }) {
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [state, setState] = useState({ loading: false, message: "", error: false });
-  const [analysis, setAnalysis] = useState({ loading: false, message: "", error: false });
+  const [registered, setRegistered] = useState(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
+
+  // 등록 후 이 화면에 남아 있는 동안만 분석 결과를 확인한다.
+  // 화면을 나가도 서버에서 분석은 계속되고 결과는 자동으로 등록된다.
+  useEffect(() => {
+    if (!registered || registered.status !== "analyzing") return undefined;
+
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(apiUrl(`/items/${registered.id}`));
+        if (response.ok) setRegistered(await response.json());
+      } catch {
+        // 일시적인 네트워크 오류는 다음 확인 때 다시 시도
+        setRegistered((current) => ({ ...current }));
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [registered]);
 
   function updateField(key, value) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  async function handleImage(file) {
+  function handleImage(file) {
     setImage(file || null);
     setPreview(file ? URL.createObjectURL(file) : null);
-    setAnalysis({ loading: false, message: "", error: false });
-
-    if (!file) return;
-
-    const body = new FormData();
-    body.append("image", file);
-    setAnalysis({ loading: true, message: "AI가 사진을 분석하고 있습니다...", error: false });
-
-    try {
-      const response = await fetch(apiUrl("/items/analyze"), {
-        method: "POST",
-        body,
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || "AI 분석 중 오류가 발생했습니다.");
-      }
-
-      const extracted = {
-        category: (data.category || "").trim(),
-        color: (data.color || "").trim(),
-        brand: (data.brand || "").trim(),
-        description: (data.features || data.description || "").trim(),
-      };
-
-      const extractedCount = Object.values(extracted).filter(Boolean).length;
-      if (extractedCount === 0) {
-        throw new Error("AI 응답은 받았지만 자동 추출된 항목이 없습니다.");
-      }
-
-      setForm((current) => ({
-        ...current,
-        category: extracted.category || current.category,
-        color: extracted.color || current.color,
-        brand: extracted.brand || current.brand,
-        description: extracted.description || current.description,
-      }));
-
-      setAnalysis({
-        loading: false,
-        message: `AI가 ${extractedCount}개 항목을 자동 입력했습니다. 필요한 부분은 직접 수정할 수 있습니다.`,
-        error: false,
-      });
-    } catch (error) {
-      setAnalysis({
-        loading: false,
-        message: error.message,
-        error: true,
-      });
-    }
   }
 
   async function submit(event) {
@@ -269,9 +268,14 @@ function RegisterView({ onGoSearch }) {
 
       setState({
         loading: false,
-        message: `습득물 #${data.id} 등록이 완료되었습니다.`,
+        message: `습득물 #${data.id} 등록이 완료되었습니다. 이 페이지를 나가셔도 됩니다.`,
         error: false,
       });
+      setRegistered(data);
+      setForm({ category: "", color: "", brand: "", description: "", location: "", occurredAt: "" });
+      setImage(null);
+      setPreview(null);
+      setFileInputKey((key) => key + 1);
     } catch (error) {
       setState({ loading: false, message: error.message, error: true });
     }
@@ -283,8 +287,8 @@ function RegisterView({ onGoSearch }) {
         <span className="eyebrow">FOUND ITEM</span>
         <h1>습득물 간편 등록</h1>
         <p>
-          습득물 사진을 선택하면 Vision-Language 모델이 물품 종류, 색상, 브랜드/로고,
-          외형적 특징을 자동 추출합니다. 사용자는 자동 입력된 내용을 확인·수정한 뒤 등록합니다.
+          사진만 올리고 등록하면 바로 끝납니다. 물품 종류, 색상, 브랜드/로고, 외형적 특징은
+          등록 후 Vision-Language 모델이 서버에서 분석해 자동으로 채우므로 페이지를 나가셔도 됩니다.
         </p>
       </div>
 
@@ -292,6 +296,7 @@ function RegisterView({ onGoSearch }) {
         <div className="upload-panel">
           <Field label="습득물 사진">
             <input
+              key={fileInputKey}
               className="file-input"
               type="file"
               accept="image/png,image/jpeg,image/webp"
@@ -304,18 +309,14 @@ function RegisterView({ onGoSearch }) {
           </div>
 
           <div className="integration-note">
-            <strong>{analysis.loading ? "Vision/VLM 분석 중..." : "AI 자동 정보 추출"}</strong>
+            <strong>AI 자동 정보 추출</strong>
             <span>
-              사진을 선택하면 물품 종류 · 색상 · 브랜드/로고 · 외형적 특징을 자동 분석하여
-              오른쪽 입력란에 채웁니다.
+              오른쪽 칸은 비워 두셔도 됩니다. 등록 후 AI가 물품 종류 · 색상 · 브랜드/로고 ·
+              외형적 특징을 분석해 빈 칸을 채웁니다. 직접 입력한 값은 그대로 유지됩니다.
             </span>
           </div>
 
-          {analysis.message ? (
-            <div className={`form-message ${analysis.error ? "error" : "success"}`}>
-              {analysis.message}
-            </div>
-          ) : null}
+          {registered ? <RegisteredItemStatus item={registered} /> : null}
         </div>
 
         <div className="form-panel">

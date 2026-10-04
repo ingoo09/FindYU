@@ -27,13 +27,17 @@ import torch
 import torch.nn.functional as F
 import io
 import json
+import logging
 import os
+import queue
 import re
 import threading
 import uuid
 
-from database import engine, Base, get_db
+from database import engine, Base, get_db, SessionLocal
 import models
+
+logger = logging.getLogger("findyu")
 
 app = FastAPI(title="FindYU Backend - Midterm Demo")
 
@@ -626,6 +630,82 @@ def serialize_item(item):
     }
 
 
+# ---------------------------------------------------------
+# 습득물 백그라운드 자동 분석
+# 습득자는 사진만 올리고 바로 나갈 수 있도록 등록은 즉시 끝내고,
+# VLM 정보 추출 + DINOv2 임베딩은 서버의 분석 스레드 하나가 순서대로 처리한다.
+# (CPU에서 모델을 여러 요청이 동시에 돌리면 메모리가 부족해지므로 한 번에 하나씩)
+# ---------------------------------------------------------
+STATUS_ANALYZING = "analyzing"
+STATUS_REGISTERED = "registered"
+STATUS_ANALYSIS_FAILED = "analysis_failed"
+
+_analysis_queue = queue.Queue()
+
+
+def analyze_registered_item(item_id: int):
+    """등록된 습득물 사진을 분석해서 비어 있는 칸만 채우고 상태를 registered로 바꾼다."""
+    db = SessionLocal()
+    try:
+        item = db.query(models.Item).filter(models.Item.id == item_id).first()
+        if item is None or item.status != STATUS_ANALYZING:
+            return
+
+        try:
+            with Image.open(item.image_path) as image:
+                rgb_image = image.convert("RGB")
+
+            if not item.embedding:
+                item.embedding = json.dumps(get_embedding(rgb_image))
+
+            info = extract_item_info(rgb_image)
+
+            # 습득자가 직접 입력한 값은 덮어쓰지 않는다
+            item.category = item.category or info["category"]
+            item.color = item.color or info["color"]
+            item.brand = item.brand or info["brand"]
+            item.description = item.description or info["features"]
+            item.status = STATUS_REGISTERED
+        except Exception:
+            logger.exception("습득물 #%s 자동 분석 실패", item_id)
+            item.status = STATUS_ANALYSIS_FAILED
+
+        db.commit()
+    finally:
+        db.close()
+
+
+def _analysis_worker():
+    while True:
+        item_id = _analysis_queue.get()
+        try:
+            analyze_registered_item(item_id)
+        except Exception:
+            logger.exception("습득물 #%s 분석 작업 오류", item_id)
+        finally:
+            _analysis_queue.task_done()
+
+
+@app.on_event("startup")
+def start_analysis_worker():
+    threading.Thread(target=_analysis_worker, name="findyu-analysis", daemon=True).start()
+
+    # 분석 도중 서버가 꺼졌던 항목은 다시 대기열에 넣는다
+    db = SessionLocal()
+    try:
+        pending = (
+            db.query(models.Item.id)
+            .filter(models.Item.status == STATUS_ANALYZING)
+            .order_by(models.Item.id)
+            .all()
+        )
+    finally:
+        db.close()
+
+    for (item_id,) in pending:
+        _analysis_queue.put(item_id)
+
+
 @app.get("/")
 def health_check():
     return {
@@ -715,17 +795,14 @@ async def register_item(
     if not image_bytes:
         raise HTTPException(status_code=400, detail="image is required")
 
-    saved_path = save_uploaded_image(image_bytes, image.filename)
-
     try:
-        pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        Image.open(io.BytesIO(image_bytes)).convert("RGB")
     except Exception as exc:
-        if os.path.exists(saved_path):
-            os.remove(saved_path)
         raise HTTPException(status_code=400, detail="invalid image file") from exc
 
-    embedding_vector = get_embedding(pil_image)
+    saved_path = save_uploaded_image(image_bytes, image.filename)
 
+    # 임베딩·VLM 분석은 기다리지 않고 바로 응답한다 (analyze_registered_item 참고)
     new_item = models.Item(
         item_type=item_type,
         category=category,
@@ -733,14 +810,16 @@ async def register_item(
         brand=brand,
         description=description,
         image_path=saved_path,
-        embedding=json.dumps(embedding_vector),
         location=location,
         occurred_at=parse_optional_datetime(occurred_at),
+        status=STATUS_ANALYZING,
     )
 
     db.add(new_item)
     db.commit()
     db.refresh(new_item)
+
+    _analysis_queue.put(new_item.id)
 
     return serialize_item(new_item)
 
