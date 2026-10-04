@@ -38,8 +38,22 @@ from database import engine, Base, get_db, SessionLocal
 import models
 from ai_retrieval import RetrievalModelManager, cosine_similarity_01
 from search_graph import run_search_graph
+from ai_query_parser import QueryParser
 
 logger = logging.getLogger("findyu")
+
+# AI 브랜치의 실행 모드 의미를 그대로 따른다.
+# query_parser_mode: "mock" | "llm"
+# registration_analyzer_mode: "mock" | "vlm"
+QUERY_PARSER_MODE = os.getenv("FINDYU_QUERY_PARSER_MODE", "llm").lower()
+QUERY_LLM_MODEL_NAME = os.getenv(
+    "FINDYU_QUERY_LLM_MODEL",
+    "Qwen/Qwen3-0.6B",
+)
+REGISTRATION_ANALYZER_MODE = os.getenv(
+    "FINDYU_REGISTRATION_ANALYZER_MODE",
+    "vlm",
+).lower()
 
 app = FastAPI(title="FindYU Backend - Midterm Demo")
 
@@ -84,6 +98,16 @@ _vlm_lock = threading.Lock()
 # candidate SigLIP image embedding cache: {image_path: (mtime, embedding)}
 _siglip_image_cache = {}
 _siglip_cache_lock = threading.Lock()
+
+_query_parser = QueryParser(
+    mode=QUERY_PARSER_MODE,
+    model_name=QUERY_LLM_MODEL_NAME,
+    prompt_path=os.path.join(
+        os.path.dirname(__file__),
+        "prompts",
+        "query_parser_system.txt",
+    ),
+)
 
 
 def get_embedding(image: Image.Image):
@@ -488,9 +512,29 @@ def _batch_ask_vlm(image: Image.Image):
 
 def extract_item_info(image: Image.Image):
     """
-    습득물 사진에서 등록 필드를 추출한 뒤
-    사용자 화면에는 한국어 정규화 값만 반환한다.
+    습득물 사진에서 등록 필드를 추출한다.
+
+    AI 브랜치 기준 mode:
+    - mock: 실제 VLM을 실행하지 않음
+    - vlm : 실제 Vision-Language 모델 실행
     """
+    if REGISTRATION_ANALYZER_MODE == "mock":
+        return {
+            "category": "이어폰",
+            "color": "흰색",
+            "brand": "애플",
+            "features": "케이스형",
+            "model": "mock",
+            "_raw_output": {},
+        }
+
+    # AI 브랜치에서는 registration_analyzer_mode="vlm"이 올바른 값이다.
+    # 사용자가 실수로 "llm"을 넣은 경우도 데모가 죽지 않도록 VLM alias로 허용한다.
+    if REGISTRATION_ANALYZER_MODE not in {"vlm", "llm"}:
+        raise ValueError(
+            "registration_analyzer_mode는 mock 또는 vlm이어야 합니다."
+        )
+
     answers = _batch_ask_vlm(image)
 
     return {
@@ -733,6 +777,9 @@ def health_check():
         "message": "FindYU backend is running",
         "image_embedding_model": MODEL_NAME,
         "text_image_embedding_model": TEXT_IMAGE_MODEL_NAME,
+        "query_parser_mode": QUERY_PARSER_MODE,
+        "query_llm_model": QUERY_LLM_MODEL_NAME,
+        "registration_analyzer_mode": REGISTRATION_ANALYZER_MODE,
         "registration_vlm_model": VLM_MODEL_NAME,
         "search_workflow": "LangGraph",
     }
@@ -890,14 +937,42 @@ async def search_items(
             except Exception as exc:
                 raise HTTPException(status_code=400, detail="invalid search image") from exc
 
+    parsed_query = {
+        "text": description,
+        "location": None,
+        "time": None,
+    }
+
+    if description:
+        try:
+            parsed_query = _query_parser.parse(description)
+        except Exception:
+            # 중간 데모에서는 Query LLM 실패가 전체 검색 실패로 이어지지 않게
+            # 원문 description으로 안전하게 fallback한다.
+            logger.exception("Query LLM parsing 실패 - 원문으로 fallback")
+            parsed_query = {
+                "text": description,
+                "location": None,
+                "time": None,
+            }
+
+    retrieval_text = parsed_query.get("text") or description
+    effective_location = location or parsed_query.get("location")
+
     try:
-        query_text_embedding = get_text_embedding(description) if description else None
+        query_text_embedding = (
+            get_text_embedding(retrieval_text)
+            if retrieval_text
+            else None
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=500,
             detail=f"SigLIP2 text embedding failed: {exc}",
         ) from exc
 
+    # UI에서 datetime-local로 받은 값은 우선 사용한다.
+    # Query LLM의 자연어 time은 현재 prototype에서 임의 날짜로 해석하지 않는다.
     query_time = parse_optional_datetime(occurred_at)
 
     candidates = (
@@ -924,7 +999,7 @@ async def search_items(
         location_score_fn=location_similarity,
         time_score_fn=time_similarity,
         serialize_fn=serialize_item,
-        query_location=location,
+        query_location=effective_location,
         query_time=query_time,
         top_k=top_k,
         weights={
@@ -937,7 +1012,8 @@ async def search_items(
 
     return {
         "query_description": description,
-        "query_location": location,
+        "parsed_query": parsed_query,
+        "query_location": effective_location,
         "query_occurred_at": occurred_at,
         "scoring_mode": "dinov2+siglip2+metadata+langgraph",
         "image_model": MODEL_NAME,

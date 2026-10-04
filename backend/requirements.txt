@@ -6,3 +6,4 @@ sqlalchemy
 torch
 transformers>=4.49.0
 langgraph
+accelerate
