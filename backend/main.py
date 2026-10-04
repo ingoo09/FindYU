@@ -125,61 +125,293 @@ def _load_vlm_model():
     return _vlm_processor, _vlm_model
 
 
-def _clean_vlm_answer(text: str, allow_none: bool = False):
-    """
-    짧은 VQA 응답을 등록 필드 값으로 정리한다.
-    """
+# ---------------------------------------------------------
+# 등록용 VLM 출력 정규화
+# - 작은 VLM이 장문/반복 문장을 만들지 않도록 CODE 선택 방식 사용
+# - category/color/brand는 최종적으로 한국어 단일 명사로 정규화
+# ---------------------------------------------------------
+CATEGORY_LABELS = {
+    "PHONE": "스마트폰",
+    "SMARTWATCH": "스마트워치",
+    "WATCH": "시계",
+    "EARBUDS": "이어폰",
+    "EARBUD_CASE": "이어폰케이스",
+    "WALLET": "지갑",
+    "CARD": "카드",
+    "KEY": "열쇠",
+    "UMBRELLA": "우산",
+    "BAG": "가방",
+    "BACKPACK": "백팩",
+    "LAPTOP": "노트북",
+    "TABLET": "태블릿",
+    "CHARGER": "충전기",
+    "CABLE": "케이블",
+    "BOTTLE": "물병",
+    "TUMBLER": "텀블러",
+    "GLASSES": "안경",
+    "MOUSE": "마우스",
+    "KEYBOARD": "키보드",
+    "BOOK": "책",
+    "PEN": "필기구",
+    "OTHER": "기타",
+}
+
+COLOR_LABELS = {
+    "BLACK": "검정",
+    "WHITE": "흰색",
+    "GRAY": "회색",
+    "SILVER": "은색",
+    "RED": "빨강",
+    "ORANGE": "주황",
+    "YELLOW": "노랑",
+    "GREEN": "초록",
+    "BLUE": "파랑",
+    "NAVY": "남색",
+    "PURPLE": "보라",
+    "PINK": "분홍",
+    "BROWN": "갈색",
+    "BEIGE": "베이지",
+    "GOLD": "금색",
+    "MULTI": "다색",
+    "UNKNOWN": "미확인",
+}
+
+FEATURE_LABELS = {
+    "SQUARE": "사각형",
+    "RECTANGULAR": "직사각형",
+    "ROUND": "원형",
+    "OVAL": "타원형",
+    "STRAP": "밴드부착",
+    "SCREEN": "화면있음",
+    "CASE": "케이스형",
+    "SCRATCH": "흠집있음",
+    "STICKER": "스티커있음",
+    "PATTERN": "무늬있음",
+    "METAL": "금속재질",
+    "PLASTIC": "플라스틱재질",
+    "FABRIC": "천재질",
+    "LEATHER": "가죽재질",
+    "TRANSPARENT": "투명부분",
+    "BUTTON": "버튼있음",
+    "CABLE": "케이블부착",
+    "HANDLE": "손잡이있음",
+    "ZIPPER": "지퍼있음",
+    "RING": "고리있음",
+    "COVER": "커버있음",
+    "KEYCHAIN": "키링있음",
+}
+
+BRAND_ALIASES = [
+    (("apple", "iphone", "airpods", "macbook"), "애플"),
+    (("samsung", "galaxy", "buds"), "삼성"),
+    (("lg", "gram"), "엘지"),
+    (("sony",), "소니"),
+    (("bose",), "보스"),
+    (("jbl",), "제이비엘"),
+    (("xiaomi", "mi "), "샤오미"),
+    (("huawei",), "화웨이"),
+    (("lenovo",), "레노버"),
+    (("logitech",), "로지텍"),
+    (("microsoft", "surface"), "마이크로소프트"),
+    (("nike",), "나이키"),
+    (("adidas",), "아디다스"),
+    (("new balance", "newbalance"), "뉴발란스"),
+    (("puma",), "푸마"),
+    (("starbucks",), "스타벅스"),
+    (("anker",), "앤커"),
+    (("belkin",), "벨킨"),
+    (("casio",), "카시오"),
+    (("seiko",), "세이코"),
+]
+
+
+def _normalize_raw_answer(text: str) -> str:
     value = (text or "").strip()
-    value = re.sub(r"^```(?:\w+)?\s*", "", value)
-    value = re.sub(r"\s*```$", "", value)
-    value = value.strip().strip('"').strip("'").strip()
+    value = re.sub(r"^```(?:\\w+)?\\s*", "", value)
+    value = re.sub(r"\\s*```$", "", value)
+    return value.strip()
 
-    # 모델이 라벨까지 붙이는 경우 제거
-    value = re.sub(
-        r"^(category|item|object|color|colour|brand|logo|features?|description|"
-        r"종류|물품|색상|색|브랜드|로고|특징|설명)\s*[:：=-]\s*",
-        "",
-        value,
-        flags=re.IGNORECASE,
-    ).strip()
 
-    if not allow_none and value.lower().strip(" .,:;") in {
-        "none", "unknown", "n/a", "not visible", "not sure", "unclear",
-        "없음", "알 수 없음", "확인 불가",
+def _pick_code(text: str, labels: dict[str, str], keyword_fallback: dict[str, str] | None = None):
+    raw = _normalize_raw_answer(text)
+    upper = raw.upper()
+
+    # 긴 code가 짧은 code를 포함할 수 있으므로 길이순 검사
+    for code in sorted(labels, key=len, reverse=True):
+        if re.search(rf"(?<![A-Z0-9_]){re.escape(code)}(?![A-Z0-9_])", upper):
+            return labels[code]
+
+    if keyword_fallback:
+        lowered = raw.lower()
+        for keyword, code in keyword_fallback.items():
+            if keyword in lowered and code in labels:
+                return labels[code]
+
+    return None
+
+
+def _normalize_category(text: str) -> str:
+    keyword_fallback = {
+        "smart watch": "SMARTWATCH",
+        "smartwatch": "SMARTWATCH",
+        "watch": "WATCH",
+        "phone": "PHONE",
+        "iphone": "PHONE",
+        "smartphone": "PHONE",
+        "earbud case": "EARBUD_CASE",
+        "earbuds case": "EARBUD_CASE",
+        "earbud": "EARBUDS",
+        "earbuds": "EARBUDS",
+        "wallet": "WALLET",
+        "card": "CARD",
+        "key": "KEY",
+        "umbrella": "UMBRELLA",
+        "backpack": "BACKPACK",
+        "bag": "BAG",
+        "laptop": "LAPTOP",
+        "tablet": "TABLET",
+        "charger": "CHARGER",
+        "cable": "CABLE",
+        "bottle": "BOTTLE",
+        "tumbler": "TUMBLER",
+        "glasses": "GLASSES",
+        "mouse": "MOUSE",
+        "keyboard": "KEYBOARD",
+        "book": "BOOK",
+        "pen": "PEN",
+    }
+    return _pick_code(text, CATEGORY_LABELS, keyword_fallback) or "기타"
+
+
+def _normalize_color(text: str) -> str:
+    keyword_fallback = {
+        "black": "BLACK",
+        "white": "WHITE",
+        "gray": "GRAY",
+        "grey": "GRAY",
+        "silver": "SILVER",
+        "red": "RED",
+        "orange": "ORANGE",
+        "yellow": "YELLOW",
+        "green": "GREEN",
+        "blue": "BLUE",
+        "navy": "NAVY",
+        "purple": "PURPLE",
+        "pink": "PINK",
+        "brown": "BROWN",
+        "beige": "BEIGE",
+        "gold": "GOLD",
+        "multicolor": "MULTI",
+        "multi-color": "MULTI",
+    }
+    return _pick_code(text, COLOR_LABELS, keyword_fallback) or "미확인"
+
+
+def _normalize_brand(text: str) -> str:
+    raw = _normalize_raw_answer(text)
+    lowered = raw.lower().strip(" .,:;")
+
+    if lowered in {
+        "", "none", "unknown", "n/a", "not visible", "not sure", "unclear",
+        "no brand", "no logo",
     }:
-        return ""
+        return "미확인"
 
-    return value.strip(" \t\r\n.,;:")
+    for aliases, korean in BRAND_ALIASES:
+        if any(alias in lowered for alias in aliases):
+            return korean
+
+    # 한글 한 단어가 직접 나온 경우에만 허용
+    korean_words = re.findall(r"[가-힣]+", raw)
+    if korean_words:
+        return korean_words[0]
+
+    # 알 수 없는 영문 브랜드를 그대로 노출하지 않고 한글 명사로 통일
+    return "미확인"
+
+
+def _normalize_features(text: str) -> str:
+    raw = _normalize_raw_answer(text)
+    upper = raw.upper()
+
+    found = []
+    for code, label in FEATURE_LABELS.items():
+        if re.search(rf"(?<![A-Z0-9_]){re.escape(code)}(?![A-Z0-9_])", upper):
+            if label not in found:
+                found.append(label)
+
+    # code를 무시하고 장문을 출력했을 때 최소 fallback
+    keyword_fallback = [
+        (("square",), "사각형"),
+        (("rectangular", "rectangle"), "직사각형"),
+        (("round", "circular"), "원형"),
+        (("oval",), "타원형"),
+        (("strap", "band"), "밴드부착"),
+        (("screen", "display"), "화면있음"),
+        (("case",), "케이스형"),
+        (("scratch",), "흠집있음"),
+        (("sticker",), "스티커있음"),
+        (("pattern",), "무늬있음"),
+        (("metal",), "금속재질"),
+        (("plastic",), "플라스틱재질"),
+        (("fabric", "cloth"), "천재질"),
+        (("leather",), "가죽재질"),
+        (("transparent", "clear"), "투명부분"),
+        (("button",), "버튼있음"),
+        (("cable", "cord"), "케이블부착"),
+        (("handle",), "손잡이있음"),
+        (("zipper", "zip"), "지퍼있음"),
+        (("ring",), "고리있음"),
+        (("cover",), "커버있음"),
+        (("keychain",), "키링있음"),
+    ]
+    lowered = raw.lower()
+    for keywords, label in keyword_fallback:
+        if any(keyword in lowered for keyword in keywords) and label not in found:
+            found.append(label)
+
+    if not found:
+        return "외형특징미확인"
+
+    return " · ".join(found[:4])
 
 
 def _batch_ask_vlm(image: Image.Image):
     """
-    작은 VLM에게 복잡한 JSON 생성을 강제하지 않고,
-    동일 사진에 대해 4개의 짧은 VQA 질문을 배치로 묻는다.
-    SmolVLM-500M처럼 작은 모델에서 이 방식이 구조화 JSON 생성보다 안정적이다.
+    작은 VLM의 자유문장 생성을 최소화하기 위해
+    category/color/features는 정해진 CODE 중 하나(또는 여러 개)만 선택하게 한다.
     """
     processor, model = _load_vlm_model()
     device = next(model.parameters()).device
     rgb_image = image.convert("RGB")
 
+    category_codes = ", ".join(CATEGORY_LABELS.keys())
+    color_codes = ", ".join(COLOR_LABELS.keys())
+    feature_codes = ", ".join(FEATURE_LABELS.keys())
+
     questions = [
         (
-            "What is the single main object in this image? "
-            "Answer ONLY with a short item type. Prefer Korean if possible. "
-            "Example answers: 스마트폰, 무선 이어폰 케이스, 지갑, 우산."
+            "Classify the single main lost-and-found object. "
+            f"Choose EXACTLY ONE code from this list: {category_codes}. "
+            "Return ONLY the code. No sentence. No explanation."
         ),
         (
-            "What is the main visible color of the main object? "
-            "Answer ONLY with the color name. Prefer Korean if possible."
+            "Classify the main visible color of the main object. "
+            f"Choose EXACTLY ONE code from this list: {color_codes}. "
+            "Return ONLY the code. No sentence. No explanation."
         ),
         (
-            "What brand name or logo is visibly identifiable on the main object? "
-            "Answer ONLY with the brand name. If no brand/logo is clearly visible, answer NONE."
+            "Identify the visible brand or logo of the main object. "
+            "Return ONLY ONE short brand name such as Apple, Samsung, Sony, Nike. "
+            "If the brand/logo is not clearly visible, return ONLY NONE. "
+            "No sentence. No explanation."
         ),
         (
-            "Describe the visible distinctive exterior features of the main object. "
-            "Mention only visible shape, material, scratches, stickers, case, pattern, or accessories. "
-            "Answer in ONE short sentence. Prefer Korean if possible."
+            "Select visible exterior feature codes for the main object. "
+            f"Choose up to FOUR codes from this list: {feature_codes}. "
+            "Return ONLY comma-separated codes. "
+            "If none are clearly visible, return ONLY NONE. "
+            "No sentence. No explanation."
         ),
     ]
 
@@ -198,8 +430,6 @@ def _batch_ask_vlm(image: Image.Image):
             processor.apply_chat_template(messages, add_generation_prompt=True)
         )
 
-    # Hugging Face SmolVLM processor의 batch 형식:
-    # text는 prompt list, images는 prompt별 image list의 nested list
     inputs = processor(
         text=prompts,
         images=[[rgb_image], [rgb_image], [rgb_image], [rgb_image]],
@@ -214,7 +444,7 @@ def _batch_ask_vlm(image: Image.Image):
     with torch.inference_mode():
         generated_ids = model.generate(
             **inputs,
-            max_new_tokens=48,
+            max_new_tokens=20,
             do_sample=False,
         )
 
@@ -233,27 +463,16 @@ def _batch_ask_vlm(image: Image.Image):
 
 def extract_item_info(image: Image.Image):
     """
-    습득물 사진에서 4개의 등록 필드를 자동 추출한다.
+    습득물 사진에서 등록 필드를 추출한 뒤
+    사용자 화면에는 한국어 정규화 값만 반환한다.
     """
     answers = _batch_ask_vlm(image)
 
-    category = _clean_vlm_answer(answers[0])
-    color = _clean_vlm_answer(answers[1])
-    brand = _clean_vlm_answer(answers[2])
-    features = _clean_vlm_answer(answers[3], allow_none=True)
-
-    # 브랜드 질문에서 NONE 계열을 빈 값으로 정리
-    if brand.lower().strip(" .,:;") in {
-        "none", "unknown", "n/a", "not visible", "not sure", "unclear",
-        "없음", "알 수 없음", "확인 불가",
-    }:
-        brand = ""
-
     return {
-        "category": category,
-        "color": color,
-        "brand": brand,
-        "features": features,
+        "category": _normalize_category(answers[0]),
+        "color": _normalize_color(answers[1]),
+        "brand": _normalize_brand(answers[2]),
+        "features": _normalize_features(answers[3]),
         "model": VLM_MODEL_NAME,
         "_raw_output": {
             "category": answers[0],
