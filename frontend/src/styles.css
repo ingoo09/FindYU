@@ -373,6 +373,68 @@ main {
   object-fit: contain;
 }
 
+.thumb-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.thumb {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #d6deea;
+  border-radius: 12px;
+  background: #f7f9fc;
+}
+
+.thumb.primary {
+  border: 2px solid #1d4f9f;
+}
+
+.thumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.thumb-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: #1d4f9f;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.thumb-actions {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+}
+
+.thumb-actions button {
+  flex: 1;
+  border: 0;
+  border-radius: 7px;
+  padding: 4px 0;
+  background: white;
+  color: #5e6e86;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.thumb-actions button:hover {
+  background: #eef4ff;
+  color: #1d4f9f;
+}
+
 .integration-note {
   display: grid;
   gap: 4px;

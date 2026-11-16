@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+const MAX_REGISTER_IMAGES = 5; // 백엔드 gemini_analyzer.MAX_IMAGES와 같게 유지
 
 function apiUrl(path) {
   return `${API_BASE}${path}`;
@@ -204,8 +205,8 @@ function RegisterView({ onGoSearch }) {
     location: "",
     occurredAt: "",
   });
-  const [image, setImage] = useState(null);
-  const [preview, setPreview] = useState(null);
+  // 첫 번째 사진이 대표 사진(검색 기준). 나머지는 AI 분석에 함께 사용된다.
+  const [images, setImages] = useState([]); // [{ file, url }]
   const [state, setState] = useState({ loading: false, message: "", error: false });
   const [registered, setRegistered] = useState(null);
   const [fileInputKey, setFileInputKey] = useState(0);
@@ -232,22 +233,57 @@ function RegisterView({ onGoSearch }) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function handleImage(file) {
-    setImage(file || null);
-    setPreview(file ? URL.createObjectURL(file) : null);
+  function addImages(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+
+    const isDuplicate = (file) =>
+      images.some((item) => item.file.name === file.name && item.file.size === file.size);
+    const fresh = files.filter((file) => !isDuplicate(file));
+    const room = MAX_REGISTER_IMAGES - images.length;
+    const accepted = fresh.slice(0, Math.max(0, room));
+
+    if (fresh.length > accepted.length) {
+      setState({
+        loading: false,
+        message: `사진은 최대 ${MAX_REGISTER_IMAGES}장까지 등록할 수 있습니다.`,
+        error: true,
+      });
+    }
+
+    setImages([...images, ...accepted.map((file) => ({ file, url: URL.createObjectURL(file) }))]);
+    // 같은 파일을 다시 고를 수 있도록 input 초기화
+    setFileInputKey((key) => key + 1);
+  }
+
+  function removeImage(index) {
+    setImages((current) => {
+      URL.revokeObjectURL(current[index].url);
+      return current.filter((_, i) => i !== index);
+    });
+  }
+
+  function makePrimary(index) {
+    setImages((current) => [current[index], ...current.filter((_, i) => i !== index)]);
+  }
+
+  function clearImages() {
+    images.forEach((item) => URL.revokeObjectURL(item.url));
+    setImages([]);
   }
 
   async function submit(event) {
     event.preventDefault();
 
-    if (!image) {
+    if (!images.length) {
       setState({ loading: false, message: "습득물 사진을 선택해주세요.", error: true });
       return;
     }
 
     const body = new FormData();
     body.append("item_type", "found");
-    body.append("image", image);
+    body.append("image", images[0].file);
+    images.slice(1).forEach((item) => body.append("extra_images", item.file));
 
     if (form.category) body.append("category", form.category);
     if (form.color) body.append("color", form.color);
@@ -273,8 +309,7 @@ function RegisterView({ onGoSearch }) {
       });
       setRegistered(data);
       setForm({ category: "", color: "", brand: "", description: "", location: "", occurredAt: "" });
-      setImage(null);
-      setPreview(null);
+      clearImages();
       setFileInputKey((key) => key + 1);
     } catch (error) {
       setState({ loading: false, message: error.message, error: true });
@@ -287,32 +322,62 @@ function RegisterView({ onGoSearch }) {
         <span className="eyebrow">FOUND ITEM</span>
         <h1>습득물 간편 등록</h1>
         <p>
-          사진만 올리고 등록하면 바로 끝납니다. 물품 종류, 색상, 브랜드/로고, 외형적 특징은
-          등록 후 Vision-Language 모델이 서버에서 분석해 자동으로 채우므로 페이지를 나가셔도 됩니다.
+          사진만 올리고 등록하면 바로 끝납니다. 물품 종류, 색상, 제조사, 기종, 외형적 특징은
+          등록 후 AI가 서버에서 분석해 자동으로 채우므로 페이지를 나가셔도 됩니다.
         </p>
       </div>
 
       <form className="form-layout" onSubmit={submit}>
         <div className="upload-panel">
-          <Field label="습득물 사진">
+          <Field
+            label={`습득물 사진 (${images.length}/${MAX_REGISTER_IMAGES})`}
+            hint="휴대폰은 후면·전면·측면을 함께 올리면 기종을 더 정확히 구분합니다. 첫 번째 사진이 대표 사진입니다."
+          >
             <input
               key={fileInputKey}
               className="file-input"
               type="file"
+              multiple
               accept="image/png,image/jpeg,image/webp"
-              onChange={(event) => handleImage(event.target.files?.[0])}
+              disabled={images.length >= MAX_REGISTER_IMAGES}
+              onChange={(event) => addImages(event.target.files)}
             />
           </Field>
 
           <div className="preview-box">
-            {preview ? <img src={preview} alt="선택한 습득물 미리보기" /> : <span>사진 미리보기</span>}
+            {images.length ? (
+              <img src={images[0].url} alt="대표 사진 미리보기" />
+            ) : (
+              <span>사진 미리보기</span>
+            )}
           </div>
+
+          {images.length ? (
+            <ul className="thumb-list" aria-label="선택한 사진">
+              {images.map((item, index) => (
+                <li key={item.url} className={`thumb ${index === 0 ? "primary" : ""}`}>
+                  <img src={item.url} alt={`선택한 사진 ${index + 1}`} />
+                  {index === 0 ? <span className="thumb-badge">대표</span> : null}
+                  <div className="thumb-actions">
+                    {index !== 0 ? (
+                      <button type="button" onClick={() => makePrimary(index)}>
+                        대표로
+                      </button>
+                    ) : null}
+                    <button type="button" onClick={() => removeImage(index)} aria-label={`사진 ${index + 1} 삭제`}>
+                      삭제
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : null}
 
           <div className="integration-note">
             <strong>AI 자동 정보 추출</strong>
             <span>
-              오른쪽 칸은 비워 두셔도 됩니다. 등록 후 AI가 물품 종류 · 색상 · 브랜드/로고 ·
-              외형적 특징을 분석해 빈 칸을 채웁니다. 직접 입력한 값은 그대로 유지됩니다.
+              오른쪽 칸은 비워 두셔도 됩니다. 등록 후 AI가 사진 전체를 함께 보고 물품 종류 · 색상 ·
+              제조사 · 기종 · 외형적 특징을 분석해 빈 칸을 채웁니다. 직접 입력한 값은 그대로 유지됩니다.
             </span>
           </div>
 
