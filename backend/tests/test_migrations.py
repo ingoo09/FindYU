@@ -82,6 +82,11 @@ def test_migrates_legacy_db(legacy_db):
         (r[0], r[7], r[8], r[5], r[10]) for r in LEGACY_ROWS
     ]
 
+    # 라벨 정규화
+    assert _rows(legacy_db, ["category", "color"]) == [
+        ("기타", "다색"), ("기타", "흰색"), ("기타", "검정"),
+    ]
+
     # 새 컬럼은 비어 있음
     assert _rows(legacy_db, [name for name, _ in migrations.NEW_COLUMNS])[0] == (None,) * len(migrations.NEW_COLUMNS)
 
@@ -149,3 +154,8 @@ def test_real_findyu_db_copy(tmp_path):
     assert _rows(db_path, ["COUNT(*)"])[0][0] == before_count
     assert _rows(db_path, ["id", "embedding"]) == before_embeddings
     assert all("\\" not in (r[0] or "") for r in _rows(db_path, ["image_path"]))
+
+    import labels
+    for category, color in _rows(db_path, ["category", "color"]):
+        assert category is None or category in labels.CATEGORIES
+        assert color is None or color in labels.COLORS

@@ -17,6 +17,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+from labels import normalize_category, normalize_color
 from paths import normalize_stored_path
 
 logger = logging.getLogger("findyu.migrations")
@@ -60,9 +61,27 @@ def _m2_normalize_image_paths(conn: sqlite3.Connection):
     logger.info("image_path 정규화: %d건", changed)
 
 
+def _m3_normalize_labels(conn: sqlite3.Connection):
+    """품명은 스마트폰/지갑/기타, 색상은 labels.COLORS로 통일. 원래 값은 백업 파일에 남는다."""
+    rows = conn.execute("SELECT id, category, color FROM items").fetchall()
+    for item_id, category, color in rows:
+        new_category = normalize_category(category)
+        new_color = normalize_color(color)
+        if (new_category, new_color) != (category, color):
+            conn.execute(
+                "UPDATE items SET category = ?, color = ? WHERE id = ?",
+                (new_category, new_color, item_id),
+            )
+            logger.warning(
+                "라벨 정규화 #%s: 품명 %r→%r, 색상 %r→%r",
+                item_id, category, new_category, color, new_color,
+            )
+
+
 MIGRATIONS = [
     (1, _m1_add_phone_wallet_columns),
     (2, _m2_normalize_image_paths),
+    (3, _m3_normalize_labels),
 ]
 LATEST_VERSION = MIGRATIONS[-1][0]
 

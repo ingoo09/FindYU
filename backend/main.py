@@ -525,8 +525,8 @@ def extract_item_info(image: Image.Image):
     """
     if REGISTRATION_ANALYZER_MODE == "mock":
         return {
-            "category": "이어폰",
-            "color": "흰색",
+            "category": labels.CATEGORY_PHONE,
+            "color": "검정",
             "brand": "애플",
             "features": "케이스형",
             "model": "mock",
@@ -542,9 +542,10 @@ def extract_item_info(image: Image.Image):
 
     answers = _batch_ask_vlm(image)
 
+    # VLM의 세부 품명(이어폰, 카드 등)은 서비스 품명(스마트폰/지갑/기타)으로 다시 매핑
     return {
-        "category": _normalize_category(answers[0]),
-        "color": _normalize_color(answers[1]),
+        "category": labels.normalize_category(_normalize_category(answers[0])),
+        "color": labels.normalize_color(_normalize_color(answers[1])),
         "brand": _normalize_brand(answers[2]),
         "features": _normalize_features(answers[3]),
         "model": VLM_MODEL_NAME,
@@ -907,8 +908,8 @@ async def register_item(
     # 임베딩·VLM 분석은 기다리지 않고 바로 응답한다 (analyze_registered_item 참고)
     new_item = models.Item(
         item_type=item_type,
-        category=category,
-        color=color,
+        category=labels.normalize_category(category),
+        color=labels.normalize_color(color),
         brand=brand,
         description=description,
         device_model=(device_model or "").strip() or None,
@@ -916,7 +917,7 @@ async def register_item(
         identification_level=normalized_level,
         has_case=labels.parse_optional_bool(has_case),
         wallet_type=normalized_wallet_type,
-        material=(material or "").strip() or None,
+        material=labels.normalize_material(material),
         verification_needed=labels.dump_str_list(verification_needed),
         image_path=saved_path,
         location=location,
