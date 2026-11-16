@@ -7,3 +7,6 @@ torch
 transformers>=4.49.0
 langgraph
 accelerate
+google-genai>=1.0
+python-dotenv
+pydantic>=2

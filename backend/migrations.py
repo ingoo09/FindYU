@@ -23,6 +23,7 @@ from paths import normalize_stored_path
 logger = logging.getLogger("findyu.migrations")
 
 # (컬럼명, SQLite 타입) — models.Item과 일치해야 함
+# v1에서 추가한 컬럼 (이미 배포된 단계이므로 이 목록은 바꾸지 말 것)
 NEW_COLUMNS = [
     ("device_model", "VARCHAR"),
     ("device_model_candidates", "TEXT"),
@@ -34,16 +35,30 @@ NEW_COLUMNS = [
 ]
 
 
+# v4에서 추가한 컬럼: 제조사, 항목별 AI 확신도
+V4_COLUMNS = [
+    ("manufacturer", "VARCHAR"),
+    ("category_confidence", "FLOAT"),
+    ("manufacturer_confidence", "FLOAT"),
+    ("device_model_confidence", "FLOAT"),
+    ("color_confidence", "FLOAT"),
+]
+
+
+def _add_columns(conn, columns):
+    existing = _columns(conn, "items")
+    for name, sql_type in columns:
+        if name not in existing:
+            conn.execute(f"ALTER TABLE items ADD COLUMN {name} {sql_type}")
+            logger.info("컬럼 추가: items.%s", name)
+
+
 def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
     return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
 
 
 def _m1_add_phone_wallet_columns(conn: sqlite3.Connection):
-    existing = _columns(conn, "items")
-    for name, sql_type in NEW_COLUMNS:
-        if name not in existing:
-            conn.execute(f"ALTER TABLE items ADD COLUMN {name} {sql_type}")
-            logger.info("컬럼 추가: items.%s", name)
+    _add_columns(conn, NEW_COLUMNS)
 
 
 def _m2_normalize_image_paths(conn: sqlite3.Connection):
@@ -78,10 +93,15 @@ def _m3_normalize_labels(conn: sqlite3.Connection):
             )
 
 
+def _m4_add_confidence_columns(conn: sqlite3.Connection):
+    _add_columns(conn, V4_COLUMNS)
+
+
 MIGRATIONS = [
     (1, _m1_add_phone_wallet_columns),
     (2, _m2_normalize_image_paths),
     (3, _m3_normalize_labels),
+    (4, _m4_add_confidence_columns),
 ]
 LATEST_VERSION = MIGRATIONS[-1][0]
 

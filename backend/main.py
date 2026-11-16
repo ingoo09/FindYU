@@ -10,9 +10,17 @@ NOTE:
 
 from datetime import datetime
 from difflib import SequenceMatcher
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# backend/.env의 환경변수를 읽는다 (이미 설정된 환경변수가 우선)
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from PIL import Image
 from transformers import AutoProcessor
@@ -42,12 +50,14 @@ from paths import UPLOAD_DIR, image_filename, resolve_image_path, to_stored_path
 from ai_retrieval import RetrievalModelManager, cosine_similarity_01
 from search_graph import run_search_graph
 from ai_query_parser import QueryParser
+import gemini_analyzer
+from gemini_analyzer import AnalyzerConfigError, AnalyzerError
 
 logger = logging.getLogger("findyu")
 
 # AI 브랜치의 실행 모드 의미를 그대로 따른다.
 # query_parser_mode: "mock" | "llm"
-# registration_analyzer_mode: "mock" | "vlm"
+# registration_analyzer_mode: "mock" | "vlm" | "gemini"
 QUERY_PARSER_MODE = os.getenv("FINDYU_QUERY_PARSER_MODE", "llm").lower()
 QUERY_LLM_MODEL_NAME = os.getenv(
     "FINDYU_QUERY_LLM_MODEL",
@@ -515,38 +525,84 @@ def _batch_ask_vlm(image: Image.Image):
     return answers[:4]
 
 
-def extract_item_info(image: Image.Image):
-    """
-    습득물 사진에서 등록 필드를 추출한다.
+_gemini_analyzer = gemini_analyzer.GeminiAnalyzer()
 
-    AI 브랜치 기준 mode:
-    - mock: 실제 VLM을 실행하지 않음
-    - vlm : 실제 Vision-Language 모델 실행
+# 세 분석 모드가 공통으로 반환하는 키. 모드가 지원하지 않는 항목은 기본값으로 둔다.
+EMPTY_ANALYSIS = {
+    "category": None,
+    "color": None,
+    "manufacturer": None,
+    "brand": None,
+    "device_model": None,
+    "device_model_candidates": [],
+    "identification_level": None,
+    "has_case": None,
+    "wallet_type": None,
+    "material": None,
+    "verification_needed": [],
+    "features": None,
+    "evidence": [],
+    "same_item": None,
+    "confidence": {},
+    "confidence_scores": {},
+    "prompt_version": None,
+    "model": None,
+}
+
+
+def extract_item_info(images: list[Image.Image]):
     """
+    습득물 사진(1장 이상)에서 등록 필드를 추출한다.
+
+    registration_analyzer_mode:
+    - mock  : 모델을 실행하지 않고 고정 결과 반환
+    - vlm   : 로컬 SmolVLM 실행 (첫 번째 사진만 사용, 기종·확신도 미지원)
+    - gemini: Gemini API + 프롬프트 v1.1 (gemini_analyzer.py)
+    """
+    if isinstance(images, Image.Image):
+        images = [images]
+    if not images:
+        raise ValueError("분석할 사진이 없습니다.")
+
     if REGISTRATION_ANALYZER_MODE == "mock":
         return {
+            **EMPTY_ANALYSIS,
             "category": labels.CATEGORY_PHONE,
             "color": "검정",
+            "manufacturer": "애플",
             "brand": "애플",
+            "device_model": "iPhone 15",
+            "device_model_candidates": ["iPhone 14"],
+            "identification_level": "추정",
+            "has_case": True,
+            "verification_needed": ["뒷면 카메라 배열 사진"],
             "features": "케이스형",
+            "same_item": True,
+            "confidence": {"category": "높음", "manufacturer": "높음", "device_model": "보통", "color": "보통"},
+            "confidence_scores": {"category": 0.9, "manufacturer": 0.9, "device_model": 0.6, "color": 0.6},
             "model": "mock",
             "_raw_output": {},
         }
+
+    if REGISTRATION_ANALYZER_MODE == "gemini":
+        return _gemini_analyzer.analyze(images)
 
     # AI 브랜치에서는 registration_analyzer_mode="vlm"이 올바른 값이다.
     # 사용자가 실수로 "llm"을 넣은 경우도 데모가 죽지 않도록 VLM alias로 허용한다.
     if REGISTRATION_ANALYZER_MODE not in {"vlm", "llm"}:
         raise ValueError(
-            "registration_analyzer_mode는 mock 또는 vlm이어야 합니다."
+            "registration_analyzer_mode는 mock, vlm, gemini 중 하나여야 합니다."
         )
 
-    answers = _batch_ask_vlm(image)
+    answers = _batch_ask_vlm(images[0])
 
     # VLM의 세부 품명(이어폰, 카드 등)은 서비스 품명(스마트폰/지갑/기타)으로 다시 매핑
+    brand = _normalize_brand(answers[2])
     return {
+        **EMPTY_ANALYSIS,
         "category": labels.normalize_category(_normalize_category(answers[0])),
         "color": labels.normalize_color(_normalize_color(answers[1])),
-        "brand": _normalize_brand(answers[2]),
+        "brand": None if brand == "미확인" else brand,
         "features": _normalize_features(answers[3]),
         "model": VLM_MODEL_NAME,
         "_raw_output": {
@@ -689,6 +745,7 @@ def serialize_item(item):
         "color": item.color,
         "brand": item.brand,
         "description": item.description,
+        "manufacturer": item.manufacturer,
         "device_model": item.device_model,
         "device_model_candidates": labels.load_str_list(item.device_model_candidates),
         "identification_level": item.identification_level,
@@ -696,6 +753,12 @@ def serialize_item(item):
         "wallet_type": item.wallet_type,
         "material": item.material,
         "verification_needed": labels.load_str_list(item.verification_needed),
+        "confidence": {
+            "category": item.category_confidence,
+            "manufacturer": item.manufacturer_confidence,
+            "device_model": item.device_model_confidence,
+            "color": item.color_confidence,
+        },
         "location": item.location,
         "occurred_at": item.occurred_at.isoformat() if item.occurred_at else None,
         "status": item.status,
@@ -718,6 +781,40 @@ STATUS_ANALYSIS_FAILED = "analysis_failed"
 _analysis_queue = queue.Queue()
 
 
+# AI 확신도를 함께 저장하는 항목: (DB 컬럼, 확신도 컬럼, 분석 결과 키)
+CONFIDENCE_FIELDS = [
+    ("category", "category_confidence", "category"),
+    ("manufacturer", "manufacturer_confidence", "manufacturer"),
+    ("device_model", "device_model_confidence", "device_model"),
+    ("color", "color_confidence", "color"),
+]
+
+
+def apply_analysis(item, info: dict):
+    """
+    분석 결과를 비어 있는 칸에만 채운다 (습득자가 직접 입력한 값은 덮어쓰지 않음).
+    확신도는 AI가 실제로 채운 항목에만 저장한다.
+    """
+    scores = info.get("confidence_scores") or {}
+    for column, confidence_column, key in CONFIDENCE_FIELDS:
+        if getattr(item, column) is None and info.get(key) is not None:
+            setattr(item, column, info[key])
+            setattr(item, confidence_column, scores.get(key))
+
+    for column in ("brand", "identification_level", "wallet_type", "material"):
+        if getattr(item, column) is None and info.get(column) is not None:
+            setattr(item, column, info[column])
+
+    if item.has_case is None and info.get("has_case") is not None:
+        item.has_case = info["has_case"]
+
+    for column in ("device_model_candidates", "verification_needed"):
+        if not getattr(item, column):
+            setattr(item, column, labels.dump_str_list(info.get(column)))
+
+    item.description = item.description or info.get("features")
+
+
 def analyze_registered_item(item_id: int):
     """등록된 습득물 사진을 분석해서 비어 있는 칸만 채우고 상태를 registered로 바꾼다."""
     db = SessionLocal()
@@ -736,14 +833,13 @@ def analyze_registered_item(item_id: int):
             if not item.embedding:
                 item.embedding = json.dumps(get_embedding(rgb_image))
 
-            info = extract_item_info(rgb_image)
-
-            # 습득자가 직접 입력한 값은 덮어쓰지 않는다
-            item.category = item.category or info["category"]
-            item.color = item.color or info["color"]
-            item.brand = item.brand or info["brand"]
-            item.description = item.description or info["features"]
+            info = extract_item_info([rgb_image])
+            apply_analysis(item, info)
             item.status = STATUS_REGISTERED
+        except AnalyzerConfigError as exc:
+            # API 키 누락 등 설정 문제: 스택트레이스 대신 해결 방법이 담긴 메시지만 남긴다
+            logger.error("습득물 #%s 자동 분석 불가: %s", item_id, exc)
+            item.status = STATUS_ANALYSIS_FAILED
         except Exception:
             logger.exception("습득물 #%s 자동 분석 실패", item_id)
             item.status = STATUS_ANALYSIS_FAILED
@@ -766,6 +862,16 @@ def _analysis_worker():
 
 @app.on_event("startup")
 def start_analysis_worker():
+    if REGISTRATION_ANALYZER_MODE == "gemini":
+        status = gemini_analyzer.config_status()
+        if status["ready"]:
+            logger.warning(
+                "등록 분석: Gemini %s (프롬프트 %s)", status["model"], status["prompt_version"]
+            )
+        else:
+            # 서버는 계속 띄우고, 분석 요청만 명확한 에러로 실패시킨다
+            logger.error("등록 분석 비활성화 - %s", status["error"])
+
     threading.Thread(target=_analysis_worker, name="findyu-analysis", daemon=True).start()
 
     # 분석 도중 서버가 꺼졌던 항목은 다시 대기열에 넣는다
@@ -795,6 +901,11 @@ def health_check():
         "query_llm_model": QUERY_LLM_MODEL_NAME,
         "registration_analyzer_mode": REGISTRATION_ANALYZER_MODE,
         "registration_vlm_model": VLM_MODEL_NAME,
+        "registration_gemini": (
+            gemini_analyzer.config_status()
+            if REGISTRATION_ANALYZER_MODE == "gemini"
+            else None
+        ),
         "search_workflow": "LangGraph",
     }
 
@@ -822,23 +933,47 @@ async def compare_images(
 
 
 @app.post("/items/analyze")
-async def analyze_item_image(image: UploadFile = File(...)):
+async def analyze_item_image(
+    image: UploadFile = File(...),
+    extra_images: list[UploadFile] | None = File(None),  # 같은 물품의 다른 각도 사진 (선택)
+):
     """
-    습득물 사진을 등록하기 전에 VLM으로 종류/색상/브랜드/외형적 특징을 추출한다.
+    습득물 사진(1장 이상)을 등록하기 전에 분석해 품명/색상/제조사/기종 등을 추출한다.
     프론트엔드는 이 결과를 입력란에 자동 채우고, 사용자가 수정한 뒤 POST /items로 확정 등록한다.
     """
-    image_bytes = await image.read()
-    if not image_bytes:
+    pil_images = []
+    for upload in [image, *(extra_images or [])]:
+        if upload is None or not upload.filename:
+            continue
+        image_bytes = await upload.read()
+        if not image_bytes:
+            continue
+        try:
+            pil_images.append(Image.open(io.BytesIO(image_bytes)).convert("RGB"))
+        except Exception as exc:
+            raise HTTPException(
+                status_code=400, detail=f"invalid image file: {upload.filename}"
+            ) from exc
+
+    if not pil_images:
         raise HTTPException(status_code=400, detail="image is required")
+    if len(pil_images) > gemini_analyzer.MAX_IMAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"사진은 최대 {gemini_analyzer.MAX_IMAGES}장까지 분석할 수 있습니다.",
+        )
 
     try:
-        pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        # Gemini/VLM 호출은 오래 걸리므로 이벤트 루프를 막지 않게 스레드에서 실행
+        result = await run_in_threadpool(extract_item_info, pil_images)
+    except AnalyzerConfigError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except AnalyzerError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=400, detail="invalid image file") from exc
-
-    try:
-        result = extract_item_info(pil_image)
-    except Exception as exc:
+        logger.exception("등록 분석 실패")
         raise HTTPException(
             status_code=500,
             detail=f"Vision-Language analysis failed: {exc}",
@@ -866,6 +1001,7 @@ async def register_item(
     color: str = Form(None),
     brand: str = Form(None),
     description: str = Form(None),
+    manufacturer: str = Form(None),
     device_model: str = Form(None),
     device_model_candidates: str = Form(None),  # JSON 배열 또는 쉼표 구분 문자열
     identification_level: str = Form(None),     # 확인 / 추정 / 미확인
@@ -912,6 +1048,7 @@ async def register_item(
         color=labels.normalize_color(color),
         brand=brand,
         description=description,
+        manufacturer=(manufacturer or "").strip() or None,
         device_model=(device_model or "").strip() or None,
         device_model_candidates=labels.dump_str_list(device_model_candidates),
         identification_level=normalized_level,

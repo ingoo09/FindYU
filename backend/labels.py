@@ -158,6 +158,15 @@ IDENTIFICATION_LEVELS = ("확인", "추정", "미확인")
 # 지갑 종류 (스마트폰/기타면 NULL)
 WALLET_TYPES = ("장지갑", "반지갑", "카드지갑")
 
+# 확신도: AI는 높음/보통/낮음으로 답하고, DB에는 숫자로 저장한다
+CONFIDENCE_SCORES = {"높음": 0.9, "보통": 0.6, "낮음": 0.3}
+CONFIDENCE_LEVELS = tuple(CONFIDENCE_SCORES)
+
+
+def confidence_to_score(value) -> float | None:
+    """'높음'→0.9, '보통'→0.6, '낮음'→0.3, 그 외 None"""
+    return CONFIDENCE_SCORES.get(_clean(value))
+
 
 def _clean(value) -> str:
     return str(value).strip() if value is not None else ""

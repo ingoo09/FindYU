@@ -69,7 +69,7 @@ def test_migrates_legacy_db(legacy_db):
     assert migrations.get_version(legacy_db) == migrations.LATEST_VERSION
 
     columns = _columns(legacy_db)
-    for name, _ in migrations.NEW_COLUMNS:
+    for name, _ in migrations.NEW_COLUMNS + migrations.V4_COLUMNS:
         assert name in columns
 
     # 역슬래시 경로 정규화
