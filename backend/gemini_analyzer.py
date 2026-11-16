@@ -26,7 +26,7 @@ import labels
 
 logger = logging.getLogger("findyu.gemini")
 
-PROMPT_VERSION = "v1.1"
+PROMPT_VERSION = "v1.2"
 PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / f"identify_item_{PROMPT_VERSION}.md"
 
 # 2026-11 비교 결과(docs/model_comparison.md) 속도·안정성 기준으로 선택
@@ -58,6 +58,13 @@ class ConfidenceByField(BaseModel):
     color: Confidence
 
 
+class GenerationEvidence(BaseModel):
+    """세대를 구분하는 특징과 그 특징이 보인 사진 번호 (1부터)"""
+
+    feature: str
+    photo: int
+
+
 class IdentifyItemResult(BaseModel):
     same_item: Optional[bool] = None
     category: Literal["스마트폰", "지갑", "기타"]
@@ -67,8 +74,9 @@ class IdentifyItemResult(BaseModel):
     color: Literal[labels.COLORS]  # type: ignore[valid-type]
     features: list[str] = Field(default_factory=list, max_length=5)
     evidence: list[str] = Field(default_factory=list, max_length=4)
+    # 식별수준은 모델이 매기지 않고 이 필드로 백엔드가 결정한다 (decide_identification_level)
+    generation_evidence: list[GenerationEvidence] = Field(default_factory=list, max_length=3)
     confidence: ConfidenceByField
-    identification_level: Literal["확인", "추정", "미확인"]
     device_model_candidates: list[str] = Field(default_factory=list, max_length=2)
     verification_needed: list[str] = Field(default_factory=list, max_length=3)
     has_case: Optional[bool] = None
@@ -185,7 +193,7 @@ class GeminiAnalyzer:
             raise AnalyzerError(f"Gemini 호출 실패: {type(exc).__name__}: {exc}") from exc
 
         result = parse_response(response)
-        normalized = normalize_result(result)
+        normalized = normalize_result(result, image_count=len(images))
         normalized["model"] = model
         return normalized
 
@@ -239,24 +247,54 @@ def _clean_list(values, limit: int, exclude: set[str] = frozenset()) -> list[str
     return result[:limit]
 
 
-def normalize_result(result: IdentifyItemResult) -> dict:
+def clean_generation_evidence(items, image_count: int | None) -> list[dict]:
+    """빈 특징, 범위를 벗어난 사진 번호(보내지 않은 사진)를 가진 항목은 버린다."""
+    cleaned = []
+    for item in items or []:
+        feature = (item.feature or "").strip()
+        photo = item.photo
+        if not feature:
+            continue
+        if photo < 1 or (image_count is not None and photo > image_count):
+            continue
+        entry = {"feature": feature, "photo": photo}
+        if entry not in cleaned:
+            cleaned.append(entry)
+    return cleaned[:3]
+
+
+def decide_identification_level(
+    device_model: str | None, category_confidence: str, generation_evidence: list
+) -> str:
+    """
+    식별수준은 모델이 아니라 백엔드가 정한다.
+    - 미확인: 기종이 없거나 품명 확신도가 "낮음"
+    - 확인  : 세대 구분 근거(특징 + 사진 번호)가 하나 이상 있음
+    - 추정  : 기종은 있으나 세대 구분 근거가 없음
+    """
+    if device_model is None or category_confidence == "낮음":
+        return "미확인"
+    return "확인" if generation_evidence else "추정"
+
+
+def normalize_result(result: IdentifyItemResult, image_count: int | None = None) -> dict:
     """스키마 결과를 DB 저장 형식으로 정리하고 품명과 맞지 않는 필드를 비운다."""
     category = labels.normalize_category(result.category) or labels.CATEGORY_OTHER
     color = labels.normalize_color(result.color) or labels.COLOR_UNKNOWN
     device_model = _clean_text(result.device_model)
 
-    identification_level = result.identification_level
-    if device_model is None:
-        identification_level = "미확인"
-
     candidates = _clean_list(
         result.device_model_candidates, 2, exclude={device_model} if device_model else set()
     )
     verification_needed = _clean_list(result.verification_needed, 3)
-
-    # "확인"인데 대안후보나 추가 확인 사항이 남아 있으면 확정이 아니므로 "추정"으로 낮춘다
-    if identification_level == "확인" and (candidates or verification_needed):
-        identification_level = "추정"
+    generation_evidence = (
+        clean_generation_evidence(result.generation_evidence, image_count)
+        if device_model is not None
+        else []
+    )
+    identification_level = decide_identification_level(
+        device_model, result.confidence.category, generation_evidence
+    )
     features = _clean_list(result.features, 5)
 
     has_case = result.has_case if category == labels.CATEGORY_PHONE else None
@@ -301,6 +339,7 @@ def normalize_result(result: IdentifyItemResult) -> dict:
         "verification_needed": verification_needed,
         "features": " · ".join(features) if features else None,
         "evidence": _clean_list(result.evidence, 4),
+        "generation_evidence": generation_evidence,
         "same_item": result.same_item,
         "confidence": confidence_labels,
         "confidence_scores": confidence_scores,

@@ -21,7 +21,7 @@ def _payload(**overrides):
         "features": ["투명 케이스", "뒷면 스티커"],
         "evidence": ["사진 1: 트리플 카메라"],
         "confidence": {"category": "높음", "manufacturer": "높음", "device_model": "보통", "color": "낮음"},
-        "identification_level": "추정",
+        "generation_evidence": [],
         "device_model_candidates": ["iPhone 15 Pro", "iPhone 14 Pro"],
         "verification_needed": ["측면 버튼 사진"],
         "has_case": True,
@@ -119,7 +119,7 @@ def test_request_structure_multiple_images(env):
     assert "<!--" not in config.system_instruction  # 변경 이력 주석은 보내지 않음
 
     assert result["model"] == "test-model"
-    assert result["prompt_version"] == "v1.1"
+    assert result["prompt_version"] == "v1.2"
 
 
 def test_falls_back_to_text_when_parsed_missing(env):
@@ -183,7 +183,7 @@ def test_normalize_phone():
 def test_normalize_wallet():
     result = ga.normalize_result(ga.IdentifyItemResult(**_payload(
         category="지갑", device_model=None, manufacturer=None, brand="닥스",
-        identification_level="추정", device_model_candidates=[], color="갈색",
+        device_model_candidates=[], color="갈색",
     )))
     assert result["wallet_type"] == "반지갑"
     assert result["material"] == "가죽"
@@ -229,7 +229,7 @@ def test_schema_converts_for_gemini():
 def test_prompt_lists_match_labels():
     prompt = ga.load_system_prompt()
     for value in (*labels.COLORS, *labels.MATERIALS, *labels.CATEGORIES, *labels.WALLET_TYPES,
-                  *labels.CONFIDENCE_LEVELS, *labels.IDENTIFICATION_LEVELS):
+                  *labels.CONFIDENCE_LEVELS):
         assert value in prompt, f"프롬프트에 '{value}'가 없음"
 
     # 프롬프트 예시 JSON의 키 = 스키마 필드
@@ -266,26 +266,54 @@ def test_exif_rotation_is_applied_for_analysis(tmp_path):
     assert namespace["open_image"](path).size == (300, 400)
 
 
+GEN_EV = [{"feature": "측면 무음 스위치 자리에 액션 버튼", "photo": 2}]
+
+
 @pytest.mark.parametrize(
-    "candidates, verification, expected",
+    "overrides, image_count, expected_level, expected_evidence",
     [
-        ([], [], "확인"),
-        (["iPhone 14 Pro"], [], "추정"),
-        ([], ["설정 내 모델명 확인"], "추정"),
-        (["iPhone 14 Pro"], ["측면 사진"], "추정"),
-        (["iPhone 15 Pro"], [], "확인"),  # device_model과 같은 후보는 제외되므로 후보 없음
+        # 세대 구분 근거가 있으면 확인 (대안후보·추가확인 항목이 있어도)
+        ({"generation_evidence": GEN_EV, "verification_needed": ["전면 사진 없음"]}, 2, "확인", GEN_EV),
+        # 근거가 없으면 추정
+        ({"generation_evidence": []}, 2, "추정", []),
+        # 보내지 않은 사진 번호를 댄 근거는 버림 → 추정
+        ({"generation_evidence": [{"feature": "액션 버튼", "photo": 3}]}, 2, "추정", []),
+        ({"generation_evidence": [{"feature": "액션 버튼", "photo": 0}]}, 2, "추정", []),
+        # 특징이 비어 있으면 버림
+        ({"generation_evidence": [{"feature": "  ", "photo": 1}]}, 2, "추정", []),
+        # 기종이 없으면 미확인 (근거도 비움)
+        ({"generation_evidence": GEN_EV, "device_model": None}, 2, "미확인", []),
+        # 품명이 불확실하면 미확인
+        ({"generation_evidence": GEN_EV, "confidence": {"category": "낮음", "manufacturer": "높음", "device_model": "높음", "color": "높음"}}, 2, "미확인", GEN_EV),
     ],
 )
-def test_confirmed_downgraded_when_candidates_or_checks_remain(candidates, verification, expected):
-    result = ga.normalize_result(ga.IdentifyItemResult(**_payload(
-        identification_level="확인",
-        device_model_candidates=candidates,
-        verification_needed=verification,
-    )))
-    assert result["identification_level"] == expected
+def test_identification_level_decided_by_backend(overrides, image_count, expected_level, expected_evidence):
+    result = ga.normalize_result(ga.IdentifyItemResult(**_payload(**overrides)), image_count=image_count)
+    assert result["identification_level"] == expected_level
+    assert result["generation_evidence"] == expected_evidence
+
+
+def test_schema_has_no_identification_level():
+    assert "identification_level" not in ga.IdentifyItemResult.model_fields
+    assert "generation_evidence" in ga.IdentifyItemResult.model_fields
+
+
+def test_analyze_passes_image_count_for_photo_validation(env):
+    payload = _payload(generation_evidence=[{"feature": "액션 버튼", "photo": 2}])
+    client = _client(SimpleNamespace(parsed=ga.IdentifyItemResult(**payload), text=None))
+    # 사진 1장만 보냈는데 2번 사진을 근거로 댄 경우 → 버리고 추정
+    result = ga.GeminiAnalyzer(client=client).analyze([_image()])
+    assert result["generation_evidence"] == []
+    assert result["identification_level"] == "추정"
 
 
 def test_prompt_has_generation_feature_rules():
     prompt = ga.load_system_prompt()
     assert "액션 버튼" in prompt and "카메라 컨트롤" in prompt
-    assert "세대 구분 특징" in prompt
+    assert "세대를 구분하는 특징" in prompt
+    assert "generation_evidence" in prompt
+    # 일반 항목은 추가확인필요사항에 넣지 않도록 안내
+    assert "설정 메뉴에서 모델명 확인" in prompt
+    # 카메라 컨트롤은 16 시리즈 이후로 유지, 16e 예외는 적지 않음
+    assert "카메라 컨트롤 버튼: iPhone 16 시리즈 이후" in prompt
+    assert "16e" not in prompt
