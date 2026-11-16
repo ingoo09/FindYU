@@ -747,6 +747,16 @@ def item_embedding(item):
 
 
 def serialize_item(item):
+    images = list(item.images or [])
+    if not images and item.image_path:
+        # item_images가 없는 경우(마이그레이션 이전 데이터 등) 대표 사진만 표시
+        image_list = [{"position": 0, "image_url": public_image_url(item.image_path)}]
+    else:
+        image_list = [
+            {"position": image.position, "image_url": public_image_url(image.image_path)}
+            for image in images
+        ]
+
     return {
         "id": item.id,
         "item_type": item.item_type,
@@ -774,6 +784,7 @@ def serialize_item(item):
         "created_at": item.created_at.isoformat() if item.created_at else None,
         "image_path": item.image_path,
         "image_url": public_image_url(item.image_path),
+        "images": image_list,
     }
 
 
@@ -837,10 +848,20 @@ def analyze_registered_item(item_id: int):
             if image_file is None:
                 raise FileNotFoundError(f"이미지 파일 없음: {item.image_path}")
             if not item.embedding:
+                # 검색 임베딩은 대표 사진 한 장 기준
                 with Image.open(image_file) as image:
                     item.embedding = json.dumps(get_embedding(image.convert("RGB")))
 
-            info = extract_item_info([open_analysis_image(image_file)])
+            # 등록 분석은 사진 전체(대표 사진 먼저)를 함께 본다
+            analysis_files = [image_file]
+            for extra in item.images or []:
+                extra_file = resolve_image_path(extra.image_path)
+                if extra_file is None:
+                    logger.warning("습득물 #%s 추가 사진 없음: %s", item_id, extra.image_path)
+                elif extra_file not in analysis_files:
+                    analysis_files.append(extra_file)
+
+            info = extract_item_info([open_analysis_image(f) for f in analysis_files])
             apply_analysis(item, info)
             item.status = STATUS_REGISTERED
         except AnalyzerConfigError as exc:
@@ -1018,7 +1039,8 @@ async def register_item(
     verification_needed: str = Form(None),      # JSON 배열 또는 쉼표 구분 문자열
     location: str = Form(None),
     occurred_at: str = Form(None),
-    image: UploadFile = File(...),
+    image: UploadFile = File(...),                        # 대표 사진
+    extra_images: list[UploadFile] | None = File(None),   # 같은 물품의 다른 각도 사진 (선택)
     db: Session = Depends(get_db),
 ):
     if item_type not in {"found", "lost"}:
@@ -1037,16 +1059,33 @@ async def register_item(
             detail=f"wallet_type must be one of {list(labels.WALLET_TYPES)}",
         )
 
-    image_bytes = await image.read()
-    if not image_bytes:
+    uploads = []  # (bytes, filename), 첫 번째가 대표 사진
+    for upload in [image, *(extra_images or [])]:
+        if upload is None or not upload.filename:
+            continue
+        image_bytes = await upload.read()
+        if not image_bytes:
+            continue
+        try:
+            with Image.open(io.BytesIO(image_bytes)) as check:
+                check.verify()
+        except Exception as exc:
+            raise HTTPException(
+                status_code=400, detail=f"invalid image file: {upload.filename}"
+            ) from exc
+        uploads.append((image_bytes, upload.filename))
+
+    if not uploads:
         raise HTTPException(status_code=400, detail="image is required")
+    if len(uploads) > gemini_analyzer.MAX_IMAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"사진은 최대 {gemini_analyzer.MAX_IMAGES}장까지 등록할 수 있습니다.",
+        )
 
-    try:
-        Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail="invalid image file") from exc
-
-    saved_path = save_uploaded_image(image_bytes, image.filename)
+    # 검증을 모두 통과한 뒤에 저장한다 (중간에 실패해도 파일이 남지 않도록)
+    saved_paths = [save_uploaded_image(data, name) for data, name in uploads]
+    saved_path = saved_paths[0]
 
     # 임베딩·VLM 분석은 기다리지 않고 바로 응답한다 (analyze_registered_item 참고)
     new_item = models.Item(
@@ -1067,6 +1106,10 @@ async def register_item(
         location=location,
         occurred_at=parse_optional_datetime(occurred_at),
         status=STATUS_ANALYZING,
+        images=[
+            models.ItemImage(image_path=path, position=position)
+            for position, path in enumerate(saved_paths)
+        ],
     )
 
     db.add(new_item)

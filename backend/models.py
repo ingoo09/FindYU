@@ -3,7 +3,8 @@ DB 테이블(모델) 정의.
 분실물/습득물을 같은 테이블에 저장하고, item_type으로 구분함.
 """
 
-from sqlalchemy import Boolean, Column, Integer, String, Float, DateTime, Text
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, DateTime, Text
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
 
@@ -40,7 +41,8 @@ class Item(Base):
     color_confidence = Column(Float, nullable=True)
 
     # 이미지
-    image_path = Column(String, nullable=True)      # 서버에 저장된 이미지 경로
+    # image_path는 대표 사진(검색 임베딩 기준). 등록된 사진 전체는 images(item_images 테이블)
+    image_path = Column(String, nullable=True)      # 서버에 저장된 대표 이미지 경로
     embedding = Column(Text, nullable=True)          # 임베딩 벡터 (JSON 문자열로 저장)
 
     # 위치·시간
@@ -50,4 +52,23 @@ class Item(Base):
     # 등록 상태
     status = Column(String, default="registered")    # registered, matched 등
 
+    created_at = Column(DateTime, server_default=func.now())
+
+    images = relationship(
+        "ItemImage",
+        order_by="ItemImage.position",
+        cascade="all, delete-orphan",
+        lazy="selectin",  # 목록 조회 시 N+1 쿼리 방지
+    )
+
+
+class ItemImage(Base):
+    """한 물품의 사진 여러 장 (예: 후면·전면·측면). position 0이 대표 사진."""
+
+    __tablename__ = "item_images"
+
+    id = Column(Integer, primary_key=True, index=True)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False, index=True)
+    image_path = Column(String, nullable=False)       # uploads/<파일명>
+    position = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, server_default=func.now())

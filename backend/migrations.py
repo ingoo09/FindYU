@@ -97,11 +97,38 @@ def _m4_add_confidence_columns(conn: sqlite3.Connection):
     _add_columns(conn, V4_COLUMNS)
 
 
+def _m5_create_item_images(conn: sqlite3.Connection):
+    """여러 장 사진 테이블 생성 + 기존 물품의 대표 사진(image_path)을 position 0으로 채운다."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS item_images (
+            id INTEGER NOT NULL PRIMARY KEY,
+            item_id INTEGER NOT NULL REFERENCES items (id) ON DELETE CASCADE,
+            image_path VARCHAR NOT NULL,
+            position INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_item_images_id ON item_images (id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_item_images_item_id ON item_images (item_id)")
+    cursor = conn.execute(
+        """
+        INSERT INTO item_images (item_id, image_path, position)
+        SELECT id, image_path, 0 FROM items
+        WHERE image_path IS NOT NULL
+          AND id NOT IN (SELECT item_id FROM item_images)
+        """
+    )
+    logger.warning("item_images 대표 사진 채움: %d건", cursor.rowcount)
+
+
 MIGRATIONS = [
     (1, _m1_add_phone_wallet_columns),
     (2, _m2_normalize_image_paths),
     (3, _m3_normalize_labels),
     (4, _m4_add_confidence_columns),
+    (5, _m5_create_item_images),
 ]
 LATEST_VERSION = MIGRATIONS[-1][0]
 

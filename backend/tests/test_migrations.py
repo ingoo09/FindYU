@@ -159,3 +159,29 @@ def test_real_findyu_db_copy(tmp_path):
     for category, color in _rows(db_path, ["category", "color"]):
         assert category is None or category in labels.CATEGORIES
         assert color is None or color in labels.COLORS
+
+
+def test_item_images_backfilled_once(legacy_db):
+    migrations.run_migrations(legacy_db)
+    conn = sqlite3.connect(legacy_db)
+    try:
+        rows = conn.execute(
+            "SELECT item_id, image_path, position FROM item_images ORDER BY item_id"
+        ).fetchall()
+    finally:
+        conn.close()
+    assert rows == [
+        (1, "uploads/a.jpeg", 0), (2, "uploads/b.jpg", 0), (3, "uploads/c.jpg", 0),
+    ]
+
+    # 다시 실행해도 중복으로 채우지 않음 (user_version을 되돌려 v5를 강제로 재실행)
+    conn = sqlite3.connect(legacy_db)
+    conn.execute("PRAGMA user_version = 4")
+    conn.commit()
+    conn.close()
+    migrations.run_migrations(legacy_db)
+    conn = sqlite3.connect(legacy_db)
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM item_images").fetchone()[0] == 3
+    finally:
+        conn.close()
