@@ -7,7 +7,11 @@ DB 연결 설정.
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = "sqlite:///./findyu.db"
+from paths import BASE_DIR
+
+# 실행 위치(CWD)와 무관하게 항상 backend/findyu.db를 사용
+DB_PATH = BASE_DIR / "findyu.db"
+DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 engine = create_engine(
     DATABASE_URL, connect_args={"check_same_thread": False}  # SQLite 전용 옵션

@@ -36,6 +36,7 @@ import uuid
 
 from database import engine, Base, get_db, SessionLocal
 import models
+from paths import UPLOAD_DIR, image_filename, resolve_image_path, to_stored_path
 from ai_retrieval import RetrievalModelManager, cosine_similarity_01
 from search_graph import run_search_graph
 from ai_query_parser import QueryParser
@@ -57,7 +58,6 @@ REGISTRATION_ANALYZER_MODE = os.getenv(
 
 app = FastAPI(title="FindYU Backend - Midterm Demo")
 
-UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app.add_middleware(
@@ -95,7 +95,7 @@ _vlm_processor = None
 _vlm_model = None
 _vlm_lock = threading.Lock()
 
-# candidate SigLIP image embedding cache: {image_path: (mtime, embedding)}
+# candidate SigLIP image embedding cache: {resolved file path: (mtime, embedding)}
 _siglip_image_cache = {}
 _siglip_cache_lock = threading.Lock()
 
@@ -124,28 +124,30 @@ def get_text_embedding(text: str):
 
 def get_siglip_image_embedding(item):
     """등록 이미지의 SigLIP2 embedding을 메모리 캐시와 함께 반환."""
-    if not item.image_path or not os.path.exists(item.image_path):
+    image_file = resolve_image_path(item.image_path)
+    if image_file is None:
         return []
 
+    cache_key = str(image_file)
     try:
-        mtime = os.path.getmtime(item.image_path)
+        mtime = image_file.stat().st_mtime
     except OSError:
         return []
 
     with _siglip_cache_lock:
-        cached = _siglip_image_cache.get(item.image_path)
+        cached = _siglip_image_cache.get(cache_key)
         if cached and cached[0] == mtime:
             return cached[1]
 
     try:
-        with Image.open(item.image_path) as image:
+        with Image.open(image_file) as image:
             vector = _retrieval_models.siglip_image(image.convert("RGB"))
     except Exception:
         logger.exception("SigLIP2 candidate embedding 실패: %s", item.image_path)
         return []
 
     with _siglip_cache_lock:
-        _siglip_image_cache[item.image_path] = (mtime, vector)
+        _siglip_image_cache[cache_key] = (mtime, vector)
 
     return vector
 
@@ -635,11 +637,8 @@ def time_similarity(query_time: datetime | None, candidate_time: datetime | None
 
 
 def public_image_url(path: str | None):
-    if not path:
-        return None
-    normalized = path.replace("\\", "/")
-    filename = os.path.basename(normalized)
-    return f"/uploads/{filename}"
+    filename = image_filename(path)
+    return f"/uploads/{filename}" if filename else None
 
 
 def save_uploaded_image(file_bytes: bytes, original_filename: str) -> str:
@@ -648,12 +647,12 @@ def save_uploaded_image(file_bytes: bytes, original_filename: str) -> str:
         ext = ".jpg"
 
     unique_name = f"{uuid.uuid4().hex}{ext}"
-    save_path = os.path.join(UPLOAD_DIR, unique_name)
 
-    with open(save_path, "wb") as file:
+    with open(UPLOAD_DIR / unique_name, "wb") as file:
         file.write(file_bytes)
 
-    return save_path
+    # DB에는 OS와 무관한 "uploads/<파일명>" 형식으로 저장
+    return to_stored_path(unique_name)
 
 
 def item_embedding(item):
@@ -670,8 +669,9 @@ def item_embedding(item):
     except (TypeError, ValueError, json.JSONDecodeError):
         pass
 
-    if item.image_path and os.path.exists(item.image_path):
-        with Image.open(item.image_path) as image:
+    image_file = resolve_image_path(item.image_path)
+    if image_file is not None:
+        with Image.open(image_file) as image:
             return get_embedding(image)
 
     return []
@@ -716,7 +716,10 @@ def analyze_registered_item(item_id: int):
             return
 
         try:
-            with Image.open(item.image_path) as image:
+            image_file = resolve_image_path(item.image_path)
+            if image_file is None:
+                raise FileNotFoundError(f"이미지 파일 없음: {item.image_path}")
+            with Image.open(image_file) as image:
                 rgb_image = image.convert("RGB")
 
             if not item.embedding:
