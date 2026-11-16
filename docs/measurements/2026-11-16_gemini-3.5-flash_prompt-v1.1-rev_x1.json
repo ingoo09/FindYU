@@ -1,0 +1,362 @@
+[
+ {
+  "model": "gemini-3.5-flash",
+  "truth": "iPhone 15 Pro",
+  "combo": "후면만",
+  "photos": [
+   "15pro_back.jpeg"
+  ],
+  "resized_retry": false,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 200,
+    "elapsed": 8.0
+   }
+  ],
+  "status": 200,
+  "body": {
+   "category": "스마트폰",
+   "color": "검정",
+   "manufacturer": "애플",
+   "brand": "애플",
+   "device_model": "iPhone Pro 시리즈",
+   "device_model_candidates": [
+    "iPhone 14 Pro",
+    "iPhone 15 Pro"
+   ],
+   "identification_level": "추정",
+   "has_case": true,
+   "wallet_type": null,
+   "material": null,
+   "verification_needed": [
+    "측면 버튼(액션 버튼 유무) 사진",
+    "전면 화면(노치/Dynamic Island 구분) 사진"
+   ],
+   "features": "트리플 카메라 및 LiDAR 스캐너 · 투명 범퍼 케이스 착용 · 후면 검정색 가죽 카드지갑 부착",
+   "evidence": [
+    "사진 1: 후면 3개의 카메라 렌즈 및 LiDAR 스캐너 구조",
+    "사진 1: 변색된 범퍼가 있는 투명 케이스 및 검정색 카드지갑 부착",
+    "세대 구분 특징 미확인: 측면 및 전면 미노출"
+   ],
+   "same_item": true,
+   "confidence": {
+    "category": "높음",
+    "manufacturer": "높음",
+    "device_model": "보통",
+    "color": "높음"
+   },
+   "confidence_scores": {
+    "category": 0.9,
+    "manufacturer": 0.9,
+    "device_model": 0.6,
+    "color": 0.9
+   },
+   "prompt_version": "v1.1",
+   "model": "gemini-3.5-flash",
+   "description": "트리플 카메라 및 LiDAR 스캐너 · 투명 범퍼 케이스 착용 · 후면 검정색 가죽 카드지갑 부착"
+  }
+ },
+ {
+  "model": "gemini-3.5-flash",
+  "truth": "iPhone 15 Pro",
+  "combo": "후면+전면",
+  "photos": [
+   "15pro_back.jpeg",
+   "15pro_front.jpeg"
+  ],
+  "resized_retry": false,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 200,
+    "elapsed": 8.4
+   }
+  ],
+  "status": 200,
+  "body": {
+   "category": "스마트폰",
+   "color": "검정",
+   "manufacturer": "애플",
+   "brand": "애플",
+   "device_model": "iPhone Pro 시리즈",
+   "device_model_candidates": [
+    "iPhone 14 Pro",
+    "iPhone 15 Pro"
+   ],
+   "identification_level": "추정",
+   "has_case": true,
+   "wallet_type": null,
+   "material": null,
+   "verification_needed": [
+    "측면 버튼(무음 스위치 또는 액션 버튼) 사진",
+    "하단 충전 단자(Lightning 또는 USB-C) 사진",
+    "케이스 탈거 후 본체 후면 색상 확인"
+   ],
+   "features": "후면 블랙 맥세이프 카드지갑 부착 · 갈색 테두리 투명 케이스 착용 · 후면 트리플 카메라 및 LiDAR 센서 · 전면 화면 보호 필름 부착",
+   "evidence": [
+    "사진 1: 애플 특유의 후면 3구 카메라 및 맥세이프 지갑 부착",
+    "사진 2: 전면 디스플레이 및 범퍼 케이스 테두리 확인",
+    "세대 구분 특징 미확인: 측면 버튼 및 하단 단자 미촬영"
+   ],
+   "same_item": true,
+   "confidence": {
+    "category": "높음",
+    "manufacturer": "높음",
+    "device_model": "보통",
+    "color": "높음"
+   },
+   "confidence_scores": {
+    "category": 0.9,
+    "manufacturer": 0.9,
+    "device_model": 0.6,
+    "color": 0.9
+   },
+   "prompt_version": "v1.1",
+   "model": "gemini-3.5-flash",
+   "description": "후면 블랙 맥세이프 카드지갑 부착 · 갈색 테두리 투명 케이스 착용 · 후면 트리플 카메라 및 LiDAR 센서 · 전면 화면 보호 필름 부착"
+  }
+ },
+ {
+  "model": "gemini-3.5-flash",
+  "truth": "iPhone 15 Pro",
+  "combo": "후면+측면(side2)",
+  "photos": [
+   "15pro_back.jpeg",
+   "15pro_side2.jpeg"
+  ],
+  "resized_retry": false,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 200,
+    "elapsed": 11.1
+   }
+  ],
+  "status": 200,
+  "body": {
+   "category": "스마트폰",
+   "color": "검정",
+   "manufacturer": "애플",
+   "brand": "애플",
+   "device_model": "iPhone 15 Pro",
+   "device_model_candidates": [
+    "iPhone 16 Pro",
+    "iPhone 14 Pro"
+   ],
+   "identification_level": "추정",
+   "has_case": true,
+   "wallet_type": null,
+   "material": null,
+   "verification_needed": [
+    "전면 디스플레이 형태(Dynamic Island 적용 여부) 확인",
+    "설정 메뉴 내 정확한 모델명 확인"
+   ],
+   "features": "갈색 테두리 투명 케이스 착용 · 후면 검은색 맥세이프 카드지갑 부착 · 후면 트리플 카메라 모듈",
+   "evidence": [
+    "사진 1: 애플 아이폰 특유의 삼각 형태 트리플 카메라 배치 확인",
+    "사진 1: 후면에 검은색 가죽 소재 맥세이프 카드지갑 결합",
+    "사진 2: 측면 무음 스위치 대신 버튼 형태의 액션 버튼 케이스 덮개 확인"
+   ],
+   "same_item": true,
+   "confidence": {
+    "category": "높음",
+    "manufacturer": "높음",
+    "device_model": "보통",
+    "color": "높음"
+   },
+   "confidence_scores": {
+    "category": 0.9,
+    "manufacturer": 0.9,
+    "device_model": 0.6,
+    "color": 0.9
+   },
+   "prompt_version": "v1.1",
+   "model": "gemini-3.5-flash",
+   "description": "갈색 테두리 투명 케이스 착용 · 후면 검은색 맥세이프 카드지갑 부착 · 후면 트리플 카메라 모듈"
+  }
+ },
+ {
+  "model": "gemini-3.5-flash",
+  "truth": "iPhone 15 Pro",
+  "combo": "5장 전체",
+  "photos": [
+   "15pro_back.jpeg",
+   "15pro_back_hand.jpeg",
+   "15pro_front.jpeg",
+   "15pro_side1.jpeg",
+   "15pro_side2.jpeg"
+  ],
+  "resized_retry": false,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 200,
+    "elapsed": 10.8
+   }
+  ],
+  "status": 200,
+  "body": {
+   "category": "스마트폰",
+   "color": "검정",
+   "manufacturer": "애플",
+   "brand": "애플",
+   "device_model": "iPhone 14 Pro",
+   "device_model_candidates": [
+    "iPhone 15 Pro",
+    "iPhone 13 Pro"
+   ],
+   "identification_level": "추정",
+   "has_case": true,
+   "wallet_type": null,
+   "material": null,
+   "verification_needed": [
+    "하단 충전 단자 규격 확인 (Lightning 또는 USB-C)",
+    "측면 무음 스위치 / 액션 버튼 구체적 형태 확인",
+    "설정 메뉴의 정보 화면에서 정확한 모델명 확인"
+   ],
+   "features": "투명 케이스 착용 · 후면 검정색 맥세이프 카드지갑 부착 · 후면 트리플 카메라 · 전면 디스플레이 스크린 보호필름",
+   "evidence": [
+    "사진 1: 후면 트리플 카메라 및 애플 아이폰 특유의 카메라 섬 배치 확인",
+    "사진 1, 2: 후면에 검정색 가죽 재질 카드지갑 부착 확인",
+    "사진 3: 전면 상단 Dynamic Island 디스플레이 형상 확인",
+    "세대 구분 특징 미확인: 측면 액션 버튼 여부 및 하단 단자 미확인"
+   ],
+   "same_item": true,
+   "confidence": {
+    "category": "높음",
+    "manufacturer": "높음",
+    "device_model": "보통",
+    "color": "높음"
+   },
+   "confidence_scores": {
+    "category": 0.9,
+    "manufacturer": 0.9,
+    "device_model": 0.6,
+    "color": 0.9
+   },
+   "prompt_version": "v1.1",
+   "model": "gemini-3.5-flash",
+   "description": "투명 케이스 착용 · 후면 검정색 맥세이프 카드지갑 부착 · 후면 트리플 카메라 · 전면 디스플레이 스크린 보호필름"
+  }
+ },
+ {
+  "model": "gemini-3.5-flash",
+  "truth": "iPhone 12",
+  "combo": "후면만",
+  "photos": [
+   "iphone12_back.jpeg"
+  ],
+  "resized_retry": false,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 200,
+    "elapsed": 8.0
+   }
+  ],
+  "status": 200,
+  "body": {
+   "category": "스마트폰",
+   "color": "파랑",
+   "manufacturer": "애플",
+   "brand": "애플",
+   "device_model": "iPhone 11",
+   "device_model_candidates": [
+    "iPhone 12"
+   ],
+   "identification_level": "추정",
+   "has_case": true,
+   "wallet_type": null,
+   "material": null,
+   "verification_needed": [
+    "케이스 탈거 후 측면 프레임 형태 확인",
+    "전면 디스플레이(노치/스피커) 확인",
+    "설정 내 기기 정보 확인"
+   ],
+   "features": "웨이브 형태 입체 실리콘 케이스 · 고양이 그림 및 발자국 패턴 · 'How can cute cats make mistakes?' 문구 · 수직 배열 듀얼 카메라",
+   "evidence": [
+    "사진 1: 정직사각형 모듈 내 수직 배열 듀얼 카메라 형태 확인",
+    "사진 1: 입체적인 굴곡이 있는 하늘색 바탕 케이스 착용",
+    "세대 구분 특징 미확인: 두꺼운 케이스로 인해 측면 프레임 곡률 식별 불가"
+   ],
+   "same_item": true,
+   "confidence": {
+    "category": "높음",
+    "manufacturer": "높음",
+    "device_model": "보통",
+    "color": "높음"
+   },
+   "confidence_scores": {
+    "category": 0.9,
+    "manufacturer": 0.9,
+    "device_model": 0.6,
+    "color": 0.9
+   },
+   "prompt_version": "v1.1",
+   "model": "gemini-3.5-flash",
+   "description": "웨이브 형태 입체 실리콘 케이스 · 고양이 그림 및 발자국 패턴 · 'How can cute cats make mistakes?' 문구 · 수직 배열 듀얼 카메라"
+  }
+ },
+ {
+  "model": "gemini-3.5-flash",
+  "truth": "iPhone 12",
+  "combo": "후면+전면",
+  "photos": [
+   "iphone12_back.jpeg",
+   "iphone12_front.jpeg"
+  ],
+  "resized_retry": false,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 200,
+    "elapsed": 10.5
+   }
+  ],
+  "status": 200,
+  "body": {
+   "category": "스마트폰",
+   "color": "흰색",
+   "manufacturer": "애플",
+   "brand": "애플",
+   "device_model": "iPhone 11",
+   "device_model_candidates": [
+    "iPhone 12",
+    "iPhone 12 mini"
+   ],
+   "identification_level": "추정",
+   "has_case": true,
+   "wallet_type": null,
+   "material": null,
+   "verification_needed": [
+    "케이스 탈거 후 본체 후면 색상 및 각인 확인",
+    "측면 프레임의 평면/곡면 여부 확인",
+    "설정 메뉴 내 정보(모델명) 확인"
+   ],
+   "features": "고양이 일러스트 케이스 · 물결 입체 패턴 케이스 · 후면 수직 듀얼 카메라 · 전면 노치 디스플레이 · 'How can cute cats make mistakes?' 문구",
+   "evidence": [
+    "사진 1: 애플 아이폰 특유의 사각형 모듈 내 수직 듀얼 카메라",
+    "사진 1: 고양이 일러스트와 영문 텍스트가 인쇄된 입체 케이스 착용",
+    "사진 2: 전면 상단 노치 디자인 확인",
+    "세대 구분 특징 미확인: 측면 프레임 형태 및 세부 버튼 구별 불가"
+   ],
+   "same_item": true,
+   "confidence": {
+    "category": "높음",
+    "manufacturer": "높음",
+    "device_model": "보통",
+    "color": "높음"
+   },
+   "confidence_scores": {
+    "category": 0.9,
+    "manufacturer": 0.9,
+    "device_model": 0.6,
+    "color": 0.9
+   },
+   "prompt_version": "v1.1",
+   "model": "gemini-3.5-flash",
+   "description": "고양이 일러스트 케이스 · 물결 입체 패턴 케이스 · 후면 수직 듀얼 카메라 · 전면 노치 디스플레이 · 'How can cute cats make mistakes?' 문구"
+  }
+ }
+]
