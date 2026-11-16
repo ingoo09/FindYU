@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
-from PIL import Image
+from PIL import Image, ImageOps
 from transformers import AutoProcessor
 
 try:
@@ -121,6 +121,15 @@ _query_parser = QueryParser(
         "query_parser_system.txt",
     ),
 )
+
+
+def open_analysis_image(source) -> Image.Image:
+    """
+    등록 분석(VLM/Gemini)에 넣을 사진을 연다. 휴대폰 사진의 EXIF 회전 정보를 반영해
+    똑바로 세운다. (검색 임베딩은 기존 저장값과 맞추기 위해 회전을 반영하지 않는다)
+    """
+    with Image.open(source) as image:
+        return ImageOps.exif_transpose(image).convert("RGB")
 
 
 def get_embedding(image: Image.Image):
@@ -827,13 +836,11 @@ def analyze_registered_item(item_id: int):
             image_file = resolve_image_path(item.image_path)
             if image_file is None:
                 raise FileNotFoundError(f"이미지 파일 없음: {item.image_path}")
-            with Image.open(image_file) as image:
-                rgb_image = image.convert("RGB")
-
             if not item.embedding:
-                item.embedding = json.dumps(get_embedding(rgb_image))
+                with Image.open(image_file) as image:
+                    item.embedding = json.dumps(get_embedding(image.convert("RGB")))
 
-            info = extract_item_info([rgb_image])
+            info = extract_item_info([open_analysis_image(image_file)])
             apply_analysis(item, info)
             item.status = STATUS_REGISTERED
         except AnalyzerConfigError as exc:
@@ -949,7 +956,7 @@ async def analyze_item_image(
         if not image_bytes:
             continue
         try:
-            pil_images.append(Image.open(io.BytesIO(image_bytes)).convert("RGB"))
+            pil_images.append(open_analysis_image(io.BytesIO(image_bytes)))
         except Exception as exc:
             raise HTTPException(
                 status_code=400, detail=f"invalid image file: {upload.filename}"

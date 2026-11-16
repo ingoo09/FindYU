@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import re
 from types import SimpleNamespace
 
@@ -238,3 +239,23 @@ def test_confidence_mapping():
     assert labels.confidence_to_score("낮음") == 0.3
     assert labels.confidence_to_score("모름") is None
     assert labels.confidence_to_score(None) is None
+
+
+def test_exif_rotation_is_applied_for_analysis(tmp_path):
+    """휴대폰 사진의 EXIF 회전(Orientation=6)을 반영해 세로로 세워야 한다."""
+    import ast
+    from PIL import ImageOps
+
+    src = Image.new("RGB", (400, 300), "red")
+    exif = src.getexif()
+    exif[0x0112] = 6
+    path = tmp_path / "rotated.jpg"
+    src.save(path, exif=exif)
+
+    # main.py를 import하면 모델·DB가 초기화되므로 함수만 꺼내 실행한다
+    main_src = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
+    func = next(n for n in ast.parse(main_src).body if isinstance(n, ast.FunctionDef) and n.name == "open_analysis_image")
+    namespace = {"Image": Image, "ImageOps": ImageOps}
+    exec(compile(ast.Module(body=[func], type_ignores=[]), "main.py", "exec"), namespace)
+
+    assert namespace["open_analysis_image"](path).size == (300, 400)
