@@ -75,11 +75,16 @@ def test_missing_key_raises_config_error(monkeypatch):
         ga.GeminiAnalyzer(client=_client()).analyze([_image()])
 
 
-def test_missing_model_and_blank_key(monkeypatch):
+def test_blank_key_and_default_model(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "   ")
     monkeypatch.delenv("FINDYU_GEMINI_MODEL", raising=False)
-    error = ga.config_status()["error"]
-    assert "GEMINI_API_KEY" in error and "FINDYU_GEMINI_MODEL" in error
+    status = ga.config_status()
+    assert "GEMINI_API_KEY" in status["error"]
+    # 모델명은 없으면 기본값
+    assert status["model"] == "gemini-3.5-flash"
+
+    monkeypatch.setenv("FINDYU_GEMINI_MODEL", "gemini-3.8-flash")
+    assert ga.config_status()["model"] == "gemini-3.8-flash"
 
 
 def test_config_status_never_exposes_key(monkeypatch):

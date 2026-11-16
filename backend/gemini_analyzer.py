@@ -7,7 +7,7 @@ Gemini 기반 습득물 등록 분석 (FINDYU_REGISTRATION_ANALYZER_MODE=gemini)
 
 환경변수
 - GEMINI_API_KEY       (필수) Google AI Studio API 키
-- FINDYU_GEMINI_MODEL  (필수) 사용할 모델명
+- FINDYU_GEMINI_MODEL  사용할 모델명, 기본 gemini-3.5-flash (예: gemini-3.8-flash로 변경 가능)
 - FINDYU_GEMINI_TIMEOUT 요청당 제한 시간(초), 기본 60
 """
 
@@ -28,6 +28,9 @@ logger = logging.getLogger("findyu.gemini")
 
 PROMPT_VERSION = "v1.1"
 PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / f"identify_item_{PROMPT_VERSION}.md"
+
+# 2026-11 비교 결과(docs/model_comparison.md) 속도·안정성 기준으로 선택
+DEFAULT_MODEL = "gemini-3.5-flash"
 
 MAX_IMAGES = 5
 MAX_IMAGE_SIDE = 1024
@@ -85,18 +88,18 @@ def load_system_prompt(path: Path = PROMPT_PATH) -> str:
 def config_status() -> dict:
     """서버 상태 표시용. API 키 값은 노출하지 않는다."""
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    model = os.getenv("FINDYU_GEMINI_MODEL", "").strip()
-    missing = [
-        name
-        for name, value in (("GEMINI_API_KEY", api_key), ("FINDYU_GEMINI_MODEL", model))
-        if not value
-    ]
+    model = gemini_model()
+    missing = [] if api_key else ["GEMINI_API_KEY"]
     return {
         "ready": not missing,
         "model": model or None,
         "prompt_version": PROMPT_VERSION,
         "error": config_error_message(missing) if missing else None,
     }
+
+
+def gemini_model() -> str:
+    return os.getenv("FINDYU_GEMINI_MODEL", "").strip() or DEFAULT_MODEL
 
 
 def config_error_message(missing: list[str]) -> str:
@@ -153,7 +156,7 @@ class GeminiAnalyzer:
             raise ValueError(f"사진은 최대 {MAX_IMAGES}장까지 분석할 수 있습니다.")
 
         client = self._get_client()
-        model = os.environ["FINDYU_GEMINI_MODEL"].strip()
+        model = gemini_model()
 
         from google.genai import errors, types
 
