@@ -58,6 +58,7 @@ class Item(Base):
         "ItemImage",
         order_by="ItemImage.position",
         cascade="all, delete-orphan",
+        passive_deletes=True,  # 삭제는 DB의 ON DELETE CASCADE에 맡김 (database.py 외래키 설정)
         lazy="selectin",  # 목록 조회 시 N+1 쿼리 방지
     )
 
