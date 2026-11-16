@@ -264,3 +264,28 @@ def test_exif_rotation_is_applied_for_analysis(tmp_path):
     exec(compile(ast.Module(body=[func], type_ignores=[]), "main.py", "exec"), namespace)
 
     assert namespace["open_analysis_image"](path).size == (300, 400)
+
+
+@pytest.mark.parametrize(
+    "candidates, verification, expected",
+    [
+        ([], [], "확인"),
+        (["iPhone 14 Pro"], [], "추정"),
+        ([], ["설정 내 모델명 확인"], "추정"),
+        (["iPhone 14 Pro"], ["측면 사진"], "추정"),
+        (["iPhone 15 Pro"], [], "확인"),  # device_model과 같은 후보는 제외되므로 후보 없음
+    ],
+)
+def test_confirmed_downgraded_when_candidates_or_checks_remain(candidates, verification, expected):
+    result = ga.normalize_result(ga.IdentifyItemResult(**_payload(
+        identification_level="확인",
+        device_model_candidates=candidates,
+        verification_needed=verification,
+    )))
+    assert result["identification_level"] == expected
+
+
+def test_prompt_has_generation_feature_rules():
+    prompt = ga.load_system_prompt()
+    assert "액션 버튼" in prompt and "카메라 컨트롤" in prompt
+    assert "세대 구분 특징" in prompt

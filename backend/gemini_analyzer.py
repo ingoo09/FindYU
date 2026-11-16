@@ -252,6 +252,11 @@ def normalize_result(result: IdentifyItemResult) -> dict:
     candidates = _clean_list(
         result.device_model_candidates, 2, exclude={device_model} if device_model else set()
     )
+    verification_needed = _clean_list(result.verification_needed, 3)
+
+    # "확인"인데 대안후보나 추가 확인 사항이 남아 있으면 확정이 아니므로 "추정"으로 낮춘다
+    if identification_level == "확인" and (candidates or verification_needed):
+        identification_level = "추정"
     features = _clean_list(result.features, 5)
 
     has_case = result.has_case if category == labels.CATEGORY_PHONE else None
@@ -293,7 +298,7 @@ def normalize_result(result: IdentifyItemResult) -> dict:
         "has_case": has_case,
         "wallet_type": wallet_type,
         "material": material,
-        "verification_needed": _clean_list(result.verification_needed, 3),
+        "verification_needed": verification_needed,
         "features": " · ".join(features) if features else None,
         "evidence": _clean_list(result.evidence, 4),
         "same_item": result.same_item,
