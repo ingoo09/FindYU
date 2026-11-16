@@ -259,11 +259,11 @@ def test_exif_rotation_is_applied_for_analysis(tmp_path):
 
     # main.py를 import하면 모델·DB가 초기화되므로 함수만 꺼내 실행한다
     main_src = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
-    func = next(n for n in ast.parse(main_src).body if isinstance(n, ast.FunctionDef) and n.name == "open_analysis_image")
+    func = next(n for n in ast.parse(main_src).body if isinstance(n, ast.FunctionDef) and n.name == "open_image")
     namespace = {"Image": Image, "ImageOps": ImageOps}
     exec(compile(ast.Module(body=[func], type_ignores=[]), "main.py", "exec"), namespace)
 
-    assert namespace["open_analysis_image"](path).size == (300, 400)
+    assert namespace["open_image"](path).size == (300, 400)
 
 
 @pytest.mark.parametrize(

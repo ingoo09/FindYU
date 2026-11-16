@@ -152,7 +152,10 @@ def test_real_findyu_db_copy(tmp_path):
     migrations.run_migrations(db_path)
 
     assert _rows(db_path, ["COUNT(*)"])[0][0] == before_count
-    assert _rows(db_path, ["id", "embedding"]) == before_embeddings
+    # 임베딩은 그대로이거나, EXIF 회전 사진이라 재계산 대상으로 비워졌어야 함 (v6)
+    after_embeddings = dict(_rows(db_path, ["id", "embedding"]))
+    for item_id, embedding in before_embeddings:
+        assert after_embeddings[item_id] in (embedding, None)
     assert all("\\" not in (r[0] or "") for r in _rows(db_path, ["image_path"]))
 
     import labels
@@ -185,3 +188,32 @@ def test_item_images_backfilled_once(legacy_db):
         assert conn.execute("SELECT COUNT(*) FROM item_images").fetchone()[0] == 3
     finally:
         conn.close()
+
+
+def test_rotated_image_embeddings_cleared(legacy_db, tmp_path, monkeypatch):
+    """EXIF 회전 사진(b.jpg)의 임베딩만 비우고, 정상 사진(c.jpg)·파일 없는 사진(a.jpeg)은 유지."""
+    from PIL import Image
+
+    import paths
+
+    uploads = tmp_path / "uploads"
+    uploads.mkdir()
+    rotated = Image.new("RGB", (40, 30), "red")
+    exif = rotated.getexif()
+    exif[0x0112] = 6
+    rotated.save(uploads / "b.jpg", exif=exif)
+    Image.new("RGB", (40, 30), "blue").save(uploads / "c.jpg")
+    monkeypatch.setattr(paths, "UPLOAD_DIR", uploads)
+
+    conn = sqlite3.connect(legacy_db)
+    conn.execute("UPDATE items SET embedding = '[0.5]' WHERE id = 3")
+    conn.commit()
+    conn.close()
+
+    migrations.run_migrations(legacy_db)
+
+    assert _rows(legacy_db, ["id", "embedding"]) == [
+        (1, "[0.1, 0.2]"),  # 파일 없음 → 유지
+        (2, None),          # 회전 정보 있음 → 재계산 대상
+        (3, "[0.5]"),       # 회전 정보 없음 → 유지
+    ]

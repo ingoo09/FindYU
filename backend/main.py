@@ -123,10 +123,10 @@ _query_parser = QueryParser(
 )
 
 
-def open_analysis_image(source) -> Image.Image:
+def open_image(source) -> Image.Image:
     """
-    등록 분석(VLM/Gemini)에 넣을 사진을 연다. 휴대폰 사진의 EXIF 회전 정보를 반영해
-    똑바로 세운다. (검색 임베딩은 기존 저장값과 맞추기 위해 회전을 반영하지 않는다)
+    사진을 RGB로 연다. 휴대폰 사진의 EXIF 회전 정보를 반영해 똑바로 세운다.
+    검색 임베딩·검색어 사진·등록 분석 모두 이 함수를 거쳐야 같은 방향으로 비교된다.
     """
     with Image.open(source) as image:
         return ImageOps.exif_transpose(image).convert("RGB")
@@ -162,8 +162,7 @@ def get_siglip_image_embedding(item):
             return cached[1]
 
     try:
-        with Image.open(image_file) as image:
-            vector = _retrieval_models.siglip_image(image.convert("RGB"))
+        vector = _retrieval_models.siglip_image(open_image(image_file))
     except Exception:
         logger.exception("SigLIP2 candidate embedding 실패: %s", item.image_path)
         return []
@@ -740,8 +739,7 @@ def item_embedding(item):
 
     image_file = resolve_image_path(item.image_path)
     if image_file is not None:
-        with Image.open(image_file) as image:
-            return get_embedding(image)
+        return get_embedding(open_image(image_file))
 
     return []
 
@@ -849,8 +847,7 @@ def analyze_registered_item(item_id: int):
                 raise FileNotFoundError(f"이미지 파일 없음: {item.image_path}")
             if not item.embedding:
                 # 검색 임베딩은 대표 사진 한 장 기준
-                with Image.open(image_file) as image:
-                    item.embedding = json.dumps(get_embedding(image.convert("RGB")))
+                item.embedding = json.dumps(get_embedding(open_image(image_file)))
 
             # 등록 분석은 사진 전체(대표 사진 먼저)를 함께 본다
             analysis_files = [image_file]
@@ -861,7 +858,7 @@ def analyze_registered_item(item_id: int):
                 elif extra_file not in analysis_files:
                     analysis_files.append(extra_file)
 
-            info = extract_item_info([open_analysis_image(f) for f in analysis_files])
+            info = extract_item_info([open_image(f) for f in analysis_files])
             apply_analysis(item, info)
             item.status = STATUS_REGISTERED
         except AnalyzerConfigError as exc:
@@ -877,7 +874,44 @@ def analyze_registered_item(item_id: int):
         db.close()
 
 
+def backfill_missing_embeddings():
+    """
+    검색 임베딩이 비어 있는 등록 완료 물품의 임베딩을 계산해 저장한다.
+    (마이그레이션 v6이 EXIF 회전 반영 전 임베딩을 비운 경우 등)
+    """
+    db = SessionLocal()
+    try:
+        items = (
+            db.query(models.Item)
+            .filter(models.Item.embedding.is_(None))
+            .filter(models.Item.status == STATUS_REGISTERED)
+            .all()
+        )
+        done = 0
+        for item in items:
+            image_file = resolve_image_path(item.image_path)
+            if image_file is None:
+                continue
+            try:
+                item.embedding = json.dumps(get_embedding(open_image(image_file)))
+                db.commit()
+                done += 1
+            except Exception:
+                db.rollback()
+                logger.exception("습득물 #%s 임베딩 재계산 실패", item.id)
+        if items:
+            logger.warning("검색 임베딩 재계산: %d / %d건", done, len(items))
+    finally:
+        db.close()
+
+
 def _analysis_worker():
+    # 모델을 한 스레드에서만 쓰도록 분석 작업 전에 같은 스레드에서 처리한다
+    try:
+        backfill_missing_embeddings()
+    except Exception:
+        logger.exception("검색 임베딩 재계산 작업 오류")
+
     while True:
         item_id = _analysis_queue.get()
         try:
@@ -946,8 +980,8 @@ async def compare_images(
     img1_bytes = await image1.read()
     img2_bytes = await image2.read()
 
-    img1 = Image.open(io.BytesIO(img1_bytes)).convert("RGB")
-    img2 = Image.open(io.BytesIO(img2_bytes)).convert("RGB")
+    img1 = open_image(io.BytesIO(img1_bytes))
+    img2 = open_image(io.BytesIO(img2_bytes))
 
     emb1 = get_embedding(img1)
     emb2 = get_embedding(img2)
@@ -977,7 +1011,7 @@ async def analyze_item_image(
         if not image_bytes:
             continue
         try:
-            pil_images.append(open_analysis_image(io.BytesIO(image_bytes)))
+            pil_images.append(open_image(io.BytesIO(image_bytes)))
         except Exception as exc:
             raise HTTPException(
                 status_code=400, detail=f"invalid image file: {upload.filename}"
@@ -1160,7 +1194,7 @@ async def search_items(
         image_bytes = await image.read()
         if image_bytes:
             try:
-                query_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+                query_image = open_image(io.BytesIO(image_bytes))
                 query_image_embedding = get_embedding(query_image)
             except Exception as exc:
                 raise HTTPException(status_code=400, detail="invalid search image") from exc

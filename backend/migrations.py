@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 
 from labels import normalize_category, normalize_color
-from paths import normalize_stored_path
+from paths import normalize_stored_path, resolve_image_path
 
 logger = logging.getLogger("findyu.migrations")
 
@@ -123,12 +123,42 @@ def _m5_create_item_images(conn: sqlite3.Connection):
     logger.warning("item_images 대표 사진 채움: %d건", cursor.rowcount)
 
 
+EXIF_ORIENTATION_TAG = 0x0112
+
+
+def _m6_clear_rotated_embeddings(conn: sqlite3.Connection):
+    """
+    EXIF 회전 정보가 있는 사진의 검색 임베딩은 회전을 반영하지 않고 계산된 값이므로 비운다.
+    서버 시작 시 main.backfill_missing_embeddings()가 회전을 반영해 다시 계산한다.
+    """
+    from PIL import Image
+
+    rows = conn.execute(
+        "SELECT id, image_path FROM items WHERE embedding IS NOT NULL AND image_path IS NOT NULL"
+    ).fetchall()
+    cleared = []
+    for item_id, image_path in rows:
+        image_file = resolve_image_path(image_path)
+        if image_file is None:
+            continue
+        try:
+            with Image.open(image_file) as image:
+                orientation = image.getexif().get(EXIF_ORIENTATION_TAG)
+        except Exception:
+            continue
+        if orientation not in (None, 1):
+            conn.execute("UPDATE items SET embedding = NULL WHERE id = ?", (item_id,))
+            cleared.append(item_id)
+    logger.warning("EXIF 회전 사진 임베딩 초기화(재계산 예정): %s", cleared or "없음")
+
+
 MIGRATIONS = [
     (1, _m1_add_phone_wallet_columns),
     (2, _m2_normalize_image_paths),
     (3, _m3_normalize_labels),
     (4, _m4_add_confidence_columns),
     (5, _m5_create_item_images),
+    (6, _m6_clear_rotated_embeddings),
 ]
 LATEST_VERSION = MIGRATIONS[-1][0]
 
