@@ -3,7 +3,7 @@ DB 테이블(모델) 정의.
 분실물/습득물을 같은 테이블에 저장하고, item_type으로 구분함.
 """
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text
+from sqlalchemy import Boolean, Column, Integer, String, Float, DateTime, Text
 from sqlalchemy.sql import func
 from database import Base
 
@@ -21,6 +21,16 @@ class Item(Base):
     color = Column(String, nullable=True)           # 색상
     brand = Column(String, nullable=True)           # 브랜드
     description = Column(Text, nullable=True)       # 자유 설명 텍스트
+
+    # 휴대폰·지갑 전용 필드 (허용값은 labels.py 참고)
+    # 새 컬럼을 추가하면 migrations.py의 NEW_COLUMNS에도 추가해야 기존 DB에 반영됨
+    device_model = Column(String, nullable=True)             # 기종 (예: 아이폰 15 Pro)
+    device_model_candidates = Column(Text, nullable=True)    # 기종 대안 후보 (JSON 배열)
+    identification_level = Column(String, nullable=True)     # 확인 / 추정 / 미확인
+    has_case = Column(Boolean, nullable=True)                # 케이스 유무 (NULL=판단 불가)
+    wallet_type = Column(String, nullable=True)              # 장지갑 / 반지갑 / 카드지갑
+    material = Column(String, nullable=True)                 # 소재
+    verification_needed = Column(Text, nullable=True)        # 추가 확인 필요 사항 (JSON 배열)
 
     # 이미지
     image_path = Column(String, nullable=True)      # 서버에 저장된 이미지 경로

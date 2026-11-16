@@ -34,8 +34,10 @@ import re
 import threading
 import uuid
 
-from database import engine, Base, get_db, SessionLocal
+from database import DB_PATH, engine, Base, get_db, SessionLocal
 import models
+import labels
+from migrations import run_migrations
 from paths import UPLOAD_DIR, image_filename, resolve_image_path, to_stored_path
 from ai_retrieval import RetrievalModelManager, cosine_similarity_01
 from search_graph import run_search_graph
@@ -71,6 +73,7 @@ app.add_middleware(
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 Base.metadata.create_all(bind=engine)
+run_migrations(DB_PATH)  # 기존 findyu.db에 새 컬럼 추가 등 (migrations.py 참고)
 
 
 # ---------------------------------------------------------
@@ -685,6 +688,13 @@ def serialize_item(item):
         "color": item.color,
         "brand": item.brand,
         "description": item.description,
+        "device_model": item.device_model,
+        "device_model_candidates": labels.load_str_list(item.device_model_candidates),
+        "identification_level": item.identification_level,
+        "has_case": item.has_case,
+        "wallet_type": item.wallet_type,
+        "material": item.material,
+        "verification_needed": labels.load_str_list(item.verification_needed),
         "location": item.location,
         "occurred_at": item.occurred_at.isoformat() if item.occurred_at else None,
         "status": item.status,
@@ -855,6 +865,13 @@ async def register_item(
     color: str = Form(None),
     brand: str = Form(None),
     description: str = Form(None),
+    device_model: str = Form(None),
+    device_model_candidates: str = Form(None),  # JSON 배열 또는 쉼표 구분 문자열
+    identification_level: str = Form(None),     # 확인 / 추정 / 미확인
+    has_case: str = Form(None),                 # true / false (빈 값 = 판단 불가)
+    wallet_type: str = Form(None),              # 장지갑 / 반지갑 / 카드지갑
+    material: str = Form(None),
+    verification_needed: str = Form(None),      # JSON 배열 또는 쉼표 구분 문자열
     location: str = Form(None),
     occurred_at: str = Form(None),
     image: UploadFile = File(...),
@@ -862,6 +879,19 @@ async def register_item(
 ):
     if item_type not in {"found", "lost"}:
         raise HTTPException(status_code=400, detail="item_type must be 'found' or 'lost'")
+
+    normalized_level = labels.normalize_identification_level(identification_level)
+    if identification_level and normalized_level is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"identification_level must be one of {list(labels.IDENTIFICATION_LEVELS)}",
+        )
+    normalized_wallet_type = labels.normalize_wallet_type(wallet_type)
+    if wallet_type and normalized_wallet_type is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"wallet_type must be one of {list(labels.WALLET_TYPES)}",
+        )
 
     image_bytes = await image.read()
     if not image_bytes:
@@ -881,6 +911,13 @@ async def register_item(
         color=color,
         brand=brand,
         description=description,
+        device_model=(device_model or "").strip() or None,
+        device_model_candidates=labels.dump_str_list(device_model_candidates),
+        identification_level=normalized_level,
+        has_case=labels.parse_optional_bool(has_case),
+        wallet_type=normalized_wallet_type,
+        material=(material or "").strip() or None,
+        verification_needed=labels.dump_str_list(verification_needed),
         image_path=saved_path,
         location=location,
         occurred_at=parse_optional_datetime(occurred_at),

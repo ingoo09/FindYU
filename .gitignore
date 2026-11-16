@@ -18,3 +18,6 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# DB 마이그레이션 백업
+backend/findyu.db.bak-*
