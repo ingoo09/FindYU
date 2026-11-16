@@ -1,0 +1,175 @@
+{
+ "model": "gemini-3.5-flash",
+ "repeat": 3,
+ "stopped": {
+  "run": 1,
+  "truth": "iPhone 15 Pro",
+  "combo": "5장 전체",
+  "reason": "429 할당량 초과"
+ },
+ "results": [
+  {
+   "run": 1,
+   "truth": "iPhone 15 Pro",
+   "combo": "후면만",
+   "photos": [
+    "15pro_back.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 40.9
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "검정",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone Pro 시리즈",
+    "device_model_candidates": [
+     "iPhone 14 Pro",
+     "iPhone 15 Pro"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "wallet_type": null,
+    "material": null,
+    "verification_needed": [
+     "전면 사진 없음 (Dynamic Island 여부 확인 불가)",
+     "측면 사진 없음 (액션 버튼 여부 확인 불가)"
+    ],
+    "features": "트리플 카메라 · LiDAR 센서 탑재 · 투명 범퍼 케이스 · 후면 검은색 카드지갑 부착",
+    "evidence": [
+     "사진 1: 후면 좌측 상단 3개의 카메라 렌즈 및 LiDAR 센서 배치",
+     "사진 1: 후면에 검은색 카드지갑 부착됨",
+     "사진 1: 투명 케이스 착용 상태"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "보통"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.6
+    },
+    "prompt_version": "v1.2",
+    "model": "gemini-3.5-flash",
+    "description": "트리플 카메라 · LiDAR 센서 탑재 · 투명 범퍼 케이스 · 후면 검은색 카드지갑 부착"
+   }
+  },
+  {
+   "run": 1,
+   "truth": "iPhone 15 Pro",
+   "combo": "후면+전면",
+   "photos": [
+    "15pro_back.jpeg",
+    "15pro_front.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 502,
+     "elapsed": 72.0
+    }
+   ],
+   "status": 502,
+   "body": {
+    "detail": "Gemini API 오류 (503): This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later."
+   }
+  },
+  {
+   "run": 1,
+   "truth": "iPhone 15 Pro",
+   "combo": "후면+측면(side2)",
+   "photos": [
+    "15pro_back.jpeg",
+    "15pro_side2.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 55.6
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "검정",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone Pro 시리즈",
+    "device_model_candidates": [
+     "iPhone 14 Pro",
+     "iPhone 15 Pro"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "wallet_type": null,
+    "material": null,
+    "verification_needed": [
+     "전면 사진 없음 (Dynamic Island 구별 불가)",
+     "케이스 착용으로 인한 측면 스위치/액션 버튼 구별 불가"
+    ],
+    "features": "후면 트리플 카메라 배열 · 투명 범퍼 케이스 착용 · 후면 맥세이프 가죽 카드지갑 부착 · 평평한 측면 프레임",
+    "evidence": [
+     "사진 1: 3개의 카메라 렌즈 및 LiDAR 센서, 후면 부착된 카드지갑 확인",
+     "사진 2: 측면 프레임 버튼 및 케이스, 카드지갑의 두께 관찰"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "높음"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.9
+    },
+    "prompt_version": "v1.2",
+    "model": "gemini-3.5-flash",
+    "description": "후면 트리플 카메라 배열 · 투명 범퍼 케이스 착용 · 후면 맥세이프 가죽 카드지갑 부착 · 평평한 측면 프레임"
+   }
+  },
+  {
+   "run": 1,
+   "truth": "iPhone 15 Pro",
+   "combo": "5장 전체",
+   "photos": [
+    "15pro_back.jpeg",
+    "15pro_back_hand.jpeg",
+    "15pro_front.jpeg",
+    "15pro_side1.jpeg",
+    "15pro_side2.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 502,
+     "elapsed": 9.4
+    }
+   ],
+   "status": 502,
+   "body": {
+    "detail": "Gemini 요청 한도를 초과했습니다 (재시도 후에도 실패, 429): You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://aistudio.google.com/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.6-flash, description: Generate content requests per day limit exceeded on Free Tier. See https://aistudio.google.com/docs/rate-limits.\nPlease retry in 3h25m44.466120728s."
+   }
+  }
+ ]
+}
