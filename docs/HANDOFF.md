@@ -141,9 +141,18 @@ d1f3595 docs: 앞선 모델 비교 측정 원본 3건 보관
   - baze·mock에서는 서버 시작·등록·검색에 로컬 모델(DINOv2·SigLIP2·Qwen)을 불러오지 않음. 기존 방식은 `FINDYU_SEARCH_ANALYZER_MODE=local`로 남김
   - 수동 백필 `backend/tools/backfill_gemini_embeddings.py` (호출 수를 보여주고 확인받은 뒤 실행, 서버 시작 시 자동 실행 안 함)
   - 테스트가 실제 DB를 쓰지 않도록 `FINDYU_DB_PATH`·`FINDYU_UPLOAD_DIR` 추가 (`tests/conftest.py`)
+- **검색 모드 기본값은 `mock`** (`search_adapter.DEFAULT_MODE`). AI의 `search_analyzer.py`가 병합되면 `baze`로 바꾼다. 기존 `.env`를 쓰는 팀원이 병합 후 검색 503을 겪지 않게 하기 위함
+- **실제 게이트웨이 확인 (2026-11-25, 호출 5회, 등록 분석 gemini-3.5-flash)**
+  | 확인 | 결과 |
+  |---|---|
+  | 일반 등록 15 Pro (후면+측면) | 등록 → 분석·임베딩 완료 9.9초, 256차원 저장 |
+  | 일반 등록 iPhone 12 (후면+전면) | 등록 → 분석·임베딩 완료 9.9초, 256차원 저장 |
+  | 사진 검색 (15 Pro 측면 side1) 검색 사진 임베딩 | 1.9초. 후보 9건 중 임베딩 있는 2건: 15 Pro 0.909 > iPhone 12 0.700, 나머지 7건은 명세 순서(최신순)로 채움 |
+  - 비교 단계는 `search_analyzer.py`가 없어 측정하지 못했다. **사진 검색 1회 전체 시간(임베딩 + 비교)은 어댑터 병합 후 측정 필요**
+  - 기존 물품 7건은 사진 임베딩이 없다 → 필요하면 백필 도구 (`FINDYU_SEARCH_ANALYZER_MODE=baze`로 실행, 7건 = 게이트웨이 2회)
 - **남은 것**
-  - AI 담당의 `backend/search_analyzer.py` (함수 형태는 `docs/REQUESTS.md` 2026-11-25 요청). 그 전에는 baze 검색이 503
-  - 실제 게이트웨이 확인: 등록 임베딩, 사진 검색 1회 전체 응답 시간(임베딩 + 비교), Argon 전환 (E2E-05)
+  - AI 담당의 `backend/search_analyzer.py` (함수 형태는 `docs/REQUESTS.md` 2026-11-25 요청). 병합되면 검색 기본값을 `baze`로
+  - 실제 게이트웨이 확인: 사진 검색 전체 응답 시간(임베딩 + 비교), 자연어 검색, Argon 전환 (E2E-05)
   - 프론트: 점수 % 대신 순위·`match_reasons`, 분석 실패 시 `defer_analysis` (`docs/REQUESTS.md`)
 - **공통 명세와 다른 점 (팀 결정)**: 사진 검색 후보를 명세 순서가 아니라 사진 임베딩 상위 10건으로 먼저 고른다
 - 중단: `analysis_pending` 재시도는 명세 변경으로 중단. 로컬 브랜치 `feature/backend-analysis-pending`에만 커밋(push·PR 안 함)
