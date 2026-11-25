@@ -146,10 +146,12 @@ d1f3595 docs: 앞선 모델 비교 측정 원본 3건 보관
 - `needs_check` 기준은 확신도·대안후보·null 여부만 본다. 케이스·카드지갑·구성 등은 확신도가 없어서 AI가 값을 냈으면 항상 false다
 - 기종 필터는 문자열 비교다 (띄어쓰기·대소문자만 무시). "아이폰 15 프로" 같은 한글 입력은 일치하지 않는다
 
-### 4-3. 목록 API (`GET /items`)
-- 지금은 분실·습득 구분 없이 **전체 물품을 한 번에** 돌려준다. 페이지 나누기, 품목·상태 필터, 정렬 옵션이 없다
-- 체크 폼 필터(`check_form.match_filters`)를 목록에도 재사용할 수 있다
-- 프론트에는 아직 목록 화면이 없다 (등록 직후 `GET /items/{id}`로 상태만 확인)
+### 4-3. 목록 API (`GET /items`) — 2026-11-25 완료 (`feature/backend-list-api`)
+- `GET /items`: `item_type`·`category`·`location`(부분 일치)·`status` 필터, `page`·`page_size`(기본 20, 최대 100), `sort`(newest/oldest). 응답이 배열에서 `{items, total, page, page_size, total_pages, has_next, sort, filters}` 객체로 바뀜
+- `GET /items/locations`: 장소 필터 선택지(장소별 물품 수)
+- 코드 `backend/item_list.py`, 테스트 `backend/tests/test_item_list.py`, 문서 `docs/API.md`
+- 남은 것: 체크 폼 항목(색상·브랜드 등)으로 거르는 필터는 목록에 아직 없음 (`check_form.match_filters` 재사용 가능), 날짜 범위 필터 없음
+- 프론트에는 아직 목록 화면이 없다. 대시보드 담당(`frontend/src/dashboard/`)이 이 API로 만든다
 
 ### 4-4. 점수 표시 수정
 - 후보 카드·대시보드의 점수는 `matching_score`를 그대로 %로 보여준다. 그런데 이미지·텍스트 유사도는 코사인 값을 `(cos + 1) / 2`로 바꾼 것이라(`ai_retrieval.cosine_similarity_01`) **관련 없는 물품도 60%대로 나온다.** 2026-11-25 확인: 휴대폰 측면 사진으로 검색했을 때 같은 휴대폰 69.5%, 이어폰 67.4%, 애플워치 66.0%

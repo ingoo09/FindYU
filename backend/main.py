@@ -52,6 +52,7 @@ from search_graph import run_search_graph
 from ai_query_parser import QueryParser
 import baze_analyzer
 import check_form
+import item_list
 import gemini_analyzer
 from gemini_analyzer import AnalyzerConfigError, AnalyzerError
 
@@ -812,9 +813,10 @@ def serialize_item(item):
 # VLM 정보 추출 + DINOv2 임베딩은 서버의 분석 스레드 하나가 순서대로 처리한다.
 # (CPU에서 모델을 여러 요청이 동시에 돌리면 메모리가 부족해지므로 한 번에 하나씩)
 # ---------------------------------------------------------
-STATUS_ANALYZING = "analyzing"
-STATUS_REGISTERED = "registered"
-STATUS_ANALYSIS_FAILED = "analysis_failed"
+# 상태 값은 목록 API의 status 필터와 함께 item_list.py에 둔다
+STATUS_ANALYZING = item_list.STATUS_ANALYZING
+STATUS_REGISTERED = item_list.STATUS_REGISTERED
+STATUS_ANALYSIS_FAILED = item_list.STATUS_ANALYSIS_FAILED
 
 _analysis_queue = queue.Queue()
 
@@ -1251,9 +1253,42 @@ async def register_item(
 
 
 @app.get("/items")
-def list_items(db: Session = Depends(get_db)):
-    items = db.query(models.Item).order_by(models.Item.created_at.desc()).all()
-    return [serialize_item(item) for item in items]
+def list_items(
+    item_type: str = None,   # found / lost (없으면 전체)
+    category: str = None,    # 스마트폰 / 이어폰 / 지갑 / 기타 (모르겠음이면 거르지 않음)
+    location: str = None,    # 부분 일치
+    status: str = None,      # analyzing / registered / analysis_failed
+    page: str = None,        # 1부터, 기본 1
+    page_size: str = None,   # 1~100, 기본 20
+    sort: str = None,        # newest(기본) / oldest (등록 시각 기준)
+    db: Session = Depends(get_db),
+):
+    """물품 목록. 필터 + 등록 시각 정렬 + 페이지 나누기 (docs/API.md 참고)."""
+    try:
+        query = item_list.parse_list_query(
+            item_type=item_type, category=category, location=location, status=status,
+            page=page, page_size=page_size, sort=sort,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    items, total = item_list.query_items(db, query)
+    return {
+        "items": [serialize_item(item) for item in items],
+        **item_list.page_info(query, total),
+        "sort": query.sort,
+        "filters": query.applied_filters(),
+    }
+
+
+# /items/{item_id}보다 먼저 선언해야 "locations"가 id로 해석되지 않는다
+@app.get("/items/locations")
+def list_item_locations(item_type: str = None, db: Session = Depends(get_db)):
+    """장소 필터 선택지: 등록된 장소와 물품 수."""
+    try:
+        return {"locations": item_list.location_options(db, item_type)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/items/{item_id}")
