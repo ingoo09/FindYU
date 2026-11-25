@@ -1,0 +1,353 @@
+[
+ {
+  "model": "gemini-3.5-flash",
+  "truth": "iPhone 15 Pro",
+  "combo": "후면만",
+  "photos": [
+   "15pro_back.jpeg"
+  ],
+  "resized_retry": false,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 200,
+    "elapsed": 36.1
+   }
+  ],
+  "status": 200,
+  "body": {
+   "category": "스마트폰",
+   "color": "검정",
+   "manufacturer": "애플",
+   "brand": "애플",
+   "device_model": "iPhone 14 Pro",
+   "device_model_candidates": [
+    "iPhone 15 Pro",
+    "iPhone 13 Pro"
+   ],
+   "identification_level": "추정",
+   "has_case": true,
+   "wallet_type": null,
+   "material": null,
+   "verification_needed": [
+    "전면 디스플레이 사진 (노치 또는 Dynamic Island 확인)",
+    "케이스 탈거 후 기기 본체 후면 사진",
+    "기기 설정 화면의 정확한 모델명 정보"
+   ],
+   "features": "트리플 카메라 · 투명 케이스 착용 · 후면 검은색 카드지갑 부착 · 케이스 테두리 변색/갈색 톤",
+   "evidence": [
+    "사진 1: 대형 트리플 카메라 렌즈 및 LiDAR 센서 구조",
+    "사진 1: 후면에 검은색 가죽 카드지갑 부착"
+   ],
+   "same_item": true,
+   "confidence": {
+    "category": "높음",
+    "manufacturer": "높음",
+    "device_model": "보통",
+    "color": "높음"
+   },
+   "confidence_scores": {
+    "category": 0.9,
+    "manufacturer": 0.9,
+    "device_model": 0.6,
+    "color": 0.9
+   },
+   "prompt_version": "v1.1",
+   "model": "gemini-3.5-flash",
+   "description": "트리플 카메라 · 투명 케이스 착용 · 후면 검은색 카드지갑 부착 · 케이스 테두리 변색/갈색 톤"
+  }
+ },
+ {
+  "model": "gemini-3.5-flash",
+  "truth": "iPhone 15 Pro",
+  "combo": "후면+전면",
+  "photos": [
+   "15pro_back.jpeg",
+   "15pro_front.jpeg"
+  ],
+  "resized_retry": false,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 200,
+    "elapsed": 34.8
+   }
+  ],
+  "status": 200,
+  "body": {
+   "category": "스마트폰",
+   "color": "검정",
+   "manufacturer": "애플",
+   "brand": "애플",
+   "device_model": "iPhone 15 Pro",
+   "device_model_candidates": [
+    "iPhone 14 Pro",
+    "iPhone 16 Pro"
+   ],
+   "identification_level": "추정",
+   "has_case": true,
+   "wallet_type": null,
+   "material": null,
+   "verification_needed": [
+    "케이스 탈거 후 본체 후면 및 측면 사진",
+    "설정 내 모델명 정보"
+   ],
+   "features": "트리플 카메라 및 LiDAR 센서 · 테두리 브라운 톤 투명 케이스 착용 · 후면 검은색 가죽 부착형 지갑 · 전면 디스플레이 보호 필름",
+   "evidence": [
+    "사진 1: 애플 특유의 대형 삼각형 구조 트리플 카메라 레이아웃",
+    "사진 1: 후면에 검은색 가죽 소재의 카드 지갑 부착",
+    "사진 2: 동일 케이스를 씌운 스마트폰 전면부"
+   ],
+   "same_item": true,
+   "confidence": {
+    "category": "높음",
+    "manufacturer": "높음",
+    "device_model": "보통",
+    "color": "높음"
+   },
+   "confidence_scores": {
+    "category": 0.9,
+    "manufacturer": 0.9,
+    "device_model": 0.6,
+    "color": 0.9
+   },
+   "prompt_version": "v1.1",
+   "model": "gemini-3.5-flash",
+   "description": "트리플 카메라 및 LiDAR 센서 · 테두리 브라운 톤 투명 케이스 착용 · 후면 검은색 가죽 부착형 지갑 · 전면 디스플레이 보호 필름"
+  }
+ },
+ {
+  "model": "gemini-3.5-flash",
+  "truth": "iPhone 15 Pro",
+  "combo": "후면+측면(side2)",
+  "photos": [
+   "15pro_back.jpeg",
+   "15pro_side2.jpeg"
+  ],
+  "resized_retry": false,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 200,
+    "elapsed": 34.6
+   }
+  ],
+  "status": 200,
+  "body": {
+   "category": "스마트폰",
+   "color": "검정",
+   "manufacturer": "애플",
+   "brand": "애플",
+   "device_model": "iPhone Pro 시리즈",
+   "device_model_candidates": [
+    "iPhone 14 Pro",
+    "iPhone 15 Pro"
+   ],
+   "identification_level": "추정",
+   "has_case": true,
+   "wallet_type": null,
+   "material": null,
+   "verification_needed": [
+    "전면 화면 상태 및 디스플레이 사진",
+    "설정 화면의 정확한 모델명"
+   ],
+   "features": "TRIPLE 카메라 및 LiDAR 센서 · 투명 범퍼 케이스 착용 · 후면 검정색 맥세이프 카드지갑 부착",
+   "evidence": [
+    "사진 1: 3개의 대형 카메라 렌즈와 LiDAR 센서 배치 구조",
+    "사진 1, 2: 후면에 부착된 검정색 카드지갑 및 범퍼 케이스 확인"
+   ],
+   "same_item": true,
+   "confidence": {
+    "category": "높음",
+    "manufacturer": "높음",
+    "device_model": "보통",
+    "color": "높음"
+   },
+   "confidence_scores": {
+    "category": 0.9,
+    "manufacturer": 0.9,
+    "device_model": 0.6,
+    "color": 0.9
+   },
+   "prompt_version": "v1.1",
+   "model": "gemini-3.5-flash",
+   "description": "TRIPLE 카메라 및 LiDAR 센서 · 투명 범퍼 케이스 착용 · 후면 검정색 맥세이프 카드지갑 부착"
+  }
+ },
+ {
+  "model": "gemini-3.5-flash",
+  "truth": "iPhone 15 Pro",
+  "combo": "5장 전체",
+  "photos": [
+   "15pro_back.jpeg",
+   "15pro_back_hand.jpeg",
+   "15pro_front.jpeg",
+   "15pro_side1.jpeg",
+   "15pro_side2.jpeg"
+  ],
+  "resized_retry": false,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 200,
+    "elapsed": 34.4
+   }
+  ],
+  "status": 200,
+  "body": {
+   "category": "스마트폰",
+   "color": "검정",
+   "manufacturer": "애플",
+   "brand": "애플",
+   "device_model": "iPhone Pro 시리즈",
+   "device_model_candidates": [
+    "iPhone 15 Pro",
+    "iPhone 14 Pro"
+   ],
+   "identification_level": "추정",
+   "has_case": true,
+   "wallet_type": null,
+   "material": null,
+   "verification_needed": [
+    "케이스 분리 후 본체 후면 색상 및 재질 확인",
+    "설정 내 정보 화면에서 정확한 모델명 확인"
+   ],
+   "features": "후면 트리플 카메라 · 검은색 맥세이프 카드지갑 부착 · 갈색 테두리 범퍼 케이스 · 전면 액정 보호필름 부착",
+   "evidence": [
+    "사진 1: 후면 3개의 카메라 렌즈와 검은색 카드지갑 부착 확인",
+    "사진 3: 전면 디스플레이와 노치/다이나믹 아일랜드 영역 확인",
+    "사진 5: 오른쪽 측면 버튼 및 범퍼 케이스 테두리 확인"
+   ],
+   "same_item": true,
+   "confidence": {
+    "category": "높음",
+    "manufacturer": "높음",
+    "device_model": "보통",
+    "color": "높음"
+   },
+   "confidence_scores": {
+    "category": 0.9,
+    "manufacturer": 0.9,
+    "device_model": 0.6,
+    "color": 0.9
+   },
+   "prompt_version": "v1.1",
+   "model": "gemini-3.5-flash",
+   "description": "후면 트리플 카메라 · 검은색 맥세이프 카드지갑 부착 · 갈색 테두리 범퍼 케이스 · 전면 액정 보호필름 부착"
+  }
+ },
+ {
+  "model": "gemini-3.5-flash",
+  "truth": "iPhone 12",
+  "combo": "후면만",
+  "photos": [
+   "iphone12_back.jpeg"
+  ],
+  "resized_retry": false,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 200,
+    "elapsed": 33.2
+   }
+  ],
+  "status": 200,
+  "body": {
+   "category": "스마트폰",
+   "color": "파랑",
+   "manufacturer": "애플",
+   "brand": "애플",
+   "device_model": "iPhone 11",
+   "device_model_candidates": [
+    "iPhone 12"
+   ],
+   "identification_level": "추정",
+   "has_case": true,
+   "wallet_type": null,
+   "material": null,
+   "verification_needed": [
+    "케이스 탈착 후 본체 뒷면 사진",
+    "스마트폰 전면 화면 사진"
+   ],
+   "features": "고양이 캐릭터 일러스트와 영문 문구 프린팅 · 입체적인 물결 모양 형태의 케이스 착용 · 후면 수직 배치 듀얼 카메라",
+   "evidence": [
+    "사진 1: 수직 배치된 후면 듀얼 카메라 및 사각형 카메라 모듈 구조",
+    "사진 1: 케이스 하단에 'How can cute cats make mistakes?' 영문 텍스트 확인"
+   ],
+   "same_item": true,
+   "confidence": {
+    "category": "높음",
+    "manufacturer": "높음",
+    "device_model": "보통",
+    "color": "보통"
+   },
+   "confidence_scores": {
+    "category": 0.9,
+    "manufacturer": 0.9,
+    "device_model": 0.6,
+    "color": 0.6
+   },
+   "prompt_version": "v1.1",
+   "model": "gemini-3.5-flash",
+   "description": "고양이 캐릭터 일러스트와 영문 문구 프린팅 · 입체적인 물결 모양 형태의 케이스 착용 · 후면 수직 배치 듀얼 카메라"
+  }
+ },
+ {
+  "model": "gemini-3.5-flash",
+  "truth": "iPhone 12",
+  "combo": "후면+전면",
+  "photos": [
+   "iphone12_back.jpeg",
+   "iphone12_front.jpeg"
+  ],
+  "resized_retry": false,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 200,
+    "elapsed": 29.9
+   }
+  ],
+  "status": 200,
+  "body": {
+   "category": "스마트폰",
+   "color": "파랑",
+   "manufacturer": "애플",
+   "brand": "애플",
+   "device_model": "iPhone 12",
+   "device_model_candidates": [
+    "iPhone 11",
+    "iPhone 12 mini"
+   ],
+   "identification_level": "추정",
+   "has_case": true,
+   "wallet_type": null,
+   "material": null,
+   "verification_needed": [
+    "케이스를 벗긴 후 본체 후면 색상 및 알루미늄/프레임 구조 확인",
+    "설정 메뉴 내 모델명 확인"
+   ],
+   "features": "고양이 일러스트 물결 케이스 · How can cute cats make mistakes? 문구 · 후면 듀얼 카메라 · 전면 상단 노치 디자인 · 입체적인 엠보싱 표면 케이스",
+   "evidence": [
+    "사진 1에서 후면 듀얼 카메라 및 고양이 그림과 영어 문구가 적힌 케이스 확인",
+    "사진 2에서 전면 상단 노치 디자인과 동일한 하늘색 케이스 테두리 확인"
+   ],
+   "same_item": true,
+   "confidence": {
+    "category": "높음",
+    "manufacturer": "높음",
+    "device_model": "보통",
+    "color": "높음"
+   },
+   "confidence_scores": {
+    "category": 0.9,
+    "manufacturer": 0.9,
+    "device_model": 0.6,
+    "color": 0.9
+   },
+   "prompt_version": "v1.1",
+   "model": "gemini-3.5-flash",
+   "description": "고양이 일러스트 물결 케이스 · How can cute cats make mistakes? 문구 · 후면 듀얼 카메라 · 전면 상단 노치 디자인 · 입체적인 엠보싱 표면 케이스"
+  }
+ }
+]

@@ -10,11 +10,19 @@ NOTE:
 
 from datetime import datetime
 from difflib import SequenceMatcher
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# backend/.env의 환경변수를 읽는다 (이미 설정된 환경변수가 우선)
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
-from PIL import Image
+from PIL import Image, ImageOps
 from transformers import AutoProcessor
 
 try:
@@ -34,17 +42,24 @@ import re
 import threading
 import uuid
 
-from database import engine, Base, get_db, SessionLocal
+from database import DB_PATH, engine, Base, get_db, SessionLocal
 import models
+import labels
+from migrations import run_migrations
+from paths import UPLOAD_DIR, image_filename, resolve_image_path, to_stored_path
 from ai_retrieval import RetrievalModelManager, cosine_similarity_01
 from search_graph import run_search_graph
 from ai_query_parser import QueryParser
+import baze_analyzer
+import check_form
+import gemini_analyzer
+from gemini_analyzer import AnalyzerConfigError, AnalyzerError
 
 logger = logging.getLogger("findyu")
 
 # AI 브랜치의 실행 모드 의미를 그대로 따른다.
 # query_parser_mode: "mock" | "llm"
-# registration_analyzer_mode: "mock" | "vlm"
+# registration_analyzer_mode: "mock" | "vlm" | "gemini" | "baze"(기본, 팩트챗 게이트웨이)
 QUERY_PARSER_MODE = os.getenv("FINDYU_QUERY_PARSER_MODE", "llm").lower()
 QUERY_LLM_MODEL_NAME = os.getenv(
     "FINDYU_QUERY_LLM_MODEL",
@@ -52,12 +67,11 @@ QUERY_LLM_MODEL_NAME = os.getenv(
 )
 REGISTRATION_ANALYZER_MODE = os.getenv(
     "FINDYU_REGISTRATION_ANALYZER_MODE",
-    "vlm",
+    "baze",
 ).lower()
 
 app = FastAPI(title="FindYU Backend - Midterm Demo")
 
-UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app.add_middleware(
@@ -71,6 +85,7 @@ app.add_middleware(
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 Base.metadata.create_all(bind=engine)
+run_migrations(DB_PATH)  # 기존 findyu.db에 새 컬럼 추가 등 (migrations.py 참고)
 
 
 # ---------------------------------------------------------
@@ -95,7 +110,7 @@ _vlm_processor = None
 _vlm_model = None
 _vlm_lock = threading.Lock()
 
-# candidate SigLIP image embedding cache: {image_path: (mtime, embedding)}
+# candidate SigLIP image embedding cache: {resolved file path: (mtime, embedding)}
 _siglip_image_cache = {}
 _siglip_cache_lock = threading.Lock()
 
@@ -108,6 +123,15 @@ _query_parser = QueryParser(
         "query_parser_system.txt",
     ),
 )
+
+
+def open_image(source) -> Image.Image:
+    """
+    사진을 RGB로 연다. 휴대폰 사진의 EXIF 회전 정보를 반영해 똑바로 세운다.
+    검색 임베딩·검색어 사진·등록 분석 모두 이 함수를 거쳐야 같은 방향으로 비교된다.
+    """
+    with Image.open(source) as image:
+        return ImageOps.exif_transpose(image).convert("RGB")
 
 
 def get_embedding(image: Image.Image):
@@ -124,28 +148,29 @@ def get_text_embedding(text: str):
 
 def get_siglip_image_embedding(item):
     """등록 이미지의 SigLIP2 embedding을 메모리 캐시와 함께 반환."""
-    if not item.image_path or not os.path.exists(item.image_path):
+    image_file = resolve_image_path(item.image_path)
+    if image_file is None:
         return []
 
+    cache_key = str(image_file)
     try:
-        mtime = os.path.getmtime(item.image_path)
+        mtime = image_file.stat().st_mtime
     except OSError:
         return []
 
     with _siglip_cache_lock:
-        cached = _siglip_image_cache.get(item.image_path)
+        cached = _siglip_image_cache.get(cache_key)
         if cached and cached[0] == mtime:
             return cached[1]
 
     try:
-        with Image.open(item.image_path) as image:
-            vector = _retrieval_models.siglip_image(image.convert("RGB"))
+        vector = _retrieval_models.siglip_image(open_image(image_file))
     except Exception:
         logger.exception("SigLIP2 candidate embedding 실패: %s", item.image_path)
         return []
 
     with _siglip_cache_lock:
-        _siglip_image_cache[item.image_path] = (mtime, vector)
+        _siglip_image_cache[cache_key] = (mtime, vector)
 
     return vector
 
@@ -510,37 +535,95 @@ def _batch_ask_vlm(image: Image.Image):
     return answers[:4]
 
 
-def extract_item_info(image: Image.Image):
-    """
-    습득물 사진에서 등록 필드를 추출한다.
+_gemini_analyzer = gemini_analyzer.GeminiAnalyzer()
+_baze_analyzer = baze_analyzer.BazeAnalyzer()
+# /items/analyze 결과를 POST /items에서 다시 쓰기 위한 보관소 (check_form.AnalysisCache 참고)
+_analysis_cache = check_form.AnalysisCache()
 
-    AI 브랜치 기준 mode:
-    - mock: 실제 VLM을 실행하지 않음
-    - vlm : 실제 Vision-Language 모델 실행
+# 세 분석 모드가 공통으로 반환하는 키. 모드가 지원하지 않는 항목은 기본값으로 둔다.
+EMPTY_ANALYSIS = {
+    "category": None,
+    "color": None,
+    "manufacturer": None,
+    "brand": None,
+    "device_model": None,
+    "device_model_candidates": [],
+    "identification_level": None,
+    "has_case": None,
+    "has_card_wallet": None,
+    "earphone_components": None,
+    "wallet_type": None,
+    "material": None,
+    "wallet_closure": None,
+    "verification_needed": [],
+    "features": None,
+    "evidence": [],
+    "generation_evidence": [],
+    "same_item": None,
+    "confidence": {},
+    "confidence_scores": {},
+    "prompt_version": None,
+    "model": None,
+}
+
+
+def extract_item_info(images: list[Image.Image]):
     """
+    습득물 사진(1장 이상)에서 등록 필드를 추출한다.
+
+    registration_analyzer_mode:
+    - mock  : 모델을 실행하지 않고 고정 결과 반환
+    - vlm   : 로컬 SmolVLM 실행 (첫 번째 사진만 사용, 기종·확신도 미지원)
+    - gemini: Gemini API + 프롬프트 v1.2 (gemini_analyzer.py)
+    - baze  : 팩트챗(BAZE) 게이트웨이로 Gemini 호출, 프롬프트·스키마는 gemini와 같음 (baze_analyzer.py)
+    """
+    if isinstance(images, Image.Image):
+        images = [images]
+    if not images:
+        raise ValueError("분석할 사진이 없습니다.")
+
     if REGISTRATION_ANALYZER_MODE == "mock":
         return {
-            "category": "이어폰",
-            "color": "흰색",
+            **EMPTY_ANALYSIS,
+            "category": labels.CATEGORY_PHONE,
+            "color": "검정",
+            "manufacturer": "애플",
             "brand": "애플",
+            "device_model": "iPhone 15",
+            "device_model_candidates": ["iPhone 14"],
+            "identification_level": "추정",
+            "has_case": True,
+            "verification_needed": ["측면 사진 없음 (액션 버튼 여부 확인 불가)"],
             "features": "케이스형",
+            "same_item": True,
+            "confidence": {"category": "높음", "manufacturer": "높음", "device_model": "보통", "color": "보통"},
+            "confidence_scores": {"category": 0.9, "manufacturer": 0.9, "device_model": 0.6, "color": 0.6},
             "model": "mock",
             "_raw_output": {},
         }
+
+    if REGISTRATION_ANALYZER_MODE == "gemini":
+        return _gemini_analyzer.analyze(images)
+
+    if REGISTRATION_ANALYZER_MODE == "baze":
+        return _baze_analyzer.analyze(images)
 
     # AI 브랜치에서는 registration_analyzer_mode="vlm"이 올바른 값이다.
     # 사용자가 실수로 "llm"을 넣은 경우도 데모가 죽지 않도록 VLM alias로 허용한다.
     if REGISTRATION_ANALYZER_MODE not in {"vlm", "llm"}:
         raise ValueError(
-            "registration_analyzer_mode는 mock 또는 vlm이어야 합니다."
+            "registration_analyzer_mode는 mock, vlm, gemini, baze 중 하나여야 합니다."
         )
 
-    answers = _batch_ask_vlm(image)
+    answers = _batch_ask_vlm(images[0])
 
+    # VLM의 세부 품명(이어폰, 카드 등)은 서비스 품명(스마트폰/지갑/기타)으로 다시 매핑
+    brand = _normalize_brand(answers[2])
     return {
-        "category": _normalize_category(answers[0]),
-        "color": _normalize_color(answers[1]),
-        "brand": _normalize_brand(answers[2]),
+        **EMPTY_ANALYSIS,
+        "category": labels.normalize_category(_normalize_category(answers[0])),
+        "color": labels.normalize_color(_normalize_color(answers[1])),
+        "brand": None if brand == "미확인" else brand,
         "features": _normalize_features(answers[3]),
         "model": VLM_MODEL_NAME,
         "_raw_output": {
@@ -635,11 +718,8 @@ def time_similarity(query_time: datetime | None, candidate_time: datetime | None
 
 
 def public_image_url(path: str | None):
-    if not path:
-        return None
-    normalized = path.replace("\\", "/")
-    filename = os.path.basename(normalized)
-    return f"/uploads/{filename}"
+    filename = image_filename(path)
+    return f"/uploads/{filename}" if filename else None
 
 
 def save_uploaded_image(file_bytes: bytes, original_filename: str) -> str:
@@ -648,12 +728,12 @@ def save_uploaded_image(file_bytes: bytes, original_filename: str) -> str:
         ext = ".jpg"
 
     unique_name = f"{uuid.uuid4().hex}{ext}"
-    save_path = os.path.join(UPLOAD_DIR, unique_name)
 
-    with open(save_path, "wb") as file:
+    with open(UPLOAD_DIR / unique_name, "wb") as file:
         file.write(file_bytes)
 
-    return save_path
+    # DB에는 OS와 무관한 "uploads/<파일명>" 형식으로 저장
+    return to_stored_path(unique_name)
 
 
 def item_embedding(item):
@@ -670,14 +750,24 @@ def item_embedding(item):
     except (TypeError, ValueError, json.JSONDecodeError):
         pass
 
-    if item.image_path and os.path.exists(item.image_path):
-        with Image.open(item.image_path) as image:
-            return get_embedding(image)
+    image_file = resolve_image_path(item.image_path)
+    if image_file is not None:
+        return get_embedding(open_image(image_file))
 
     return []
 
 
 def serialize_item(item):
+    images = list(item.images or [])
+    if not images and item.image_path:
+        # item_images가 없는 경우(마이그레이션 이전 데이터 등) 대표 사진만 표시
+        image_list = [{"position": 0, "image_url": public_image_url(item.image_path)}]
+    else:
+        image_list = [
+            {"position": image.position, "image_url": public_image_url(image.image_path)}
+            for image in images
+        ]
+
     return {
         "id": item.id,
         "item_type": item.item_type,
@@ -685,12 +775,34 @@ def serialize_item(item):
         "color": item.color,
         "brand": item.brand,
         "description": item.description,
+        "manufacturer": item.manufacturer,
+        "device_model": item.device_model,
+        "device_model_candidates": labels.load_str_list(item.device_model_candidates),
+        "identification_level": item.identification_level,
+        "has_case": item.has_case,
+        "has_card_wallet": item.has_card_wallet,
+        "earphone_components": item.earphone_components,
+        "wallet_type": item.wallet_type,
+        "material": item.material,
+        "wallet_closure": item.wallet_closure,
+        "verification_needed": labels.load_str_list(item.verification_needed),
+        # 체크 폼 기준 값과 항목별 출처(human/ai)
+        "form_values": check_form.item_form_values(item),
+        "field_sources": json.loads(item.field_sources) if item.field_sources else {},
+        "analysis_model": item.analysis_model,
+        "confidence": {
+            "category": item.category_confidence,
+            "manufacturer": item.manufacturer_confidence,
+            "device_model": item.device_model_confidence,
+            "color": item.color_confidence,
+        },
         "location": item.location,
         "occurred_at": item.occurred_at.isoformat() if item.occurred_at else None,
         "status": item.status,
         "created_at": item.created_at.isoformat() if item.created_at else None,
         "image_path": item.image_path,
         "image_url": public_image_url(item.image_path),
+        "images": image_list,
     }
 
 
@@ -707,6 +819,52 @@ STATUS_ANALYSIS_FAILED = "analysis_failed"
 _analysis_queue = queue.Queue()
 
 
+# AI 확신도를 함께 저장하는 항목: (DB 컬럼, 확신도 컬럼, 분석 결과 키)
+CONFIDENCE_FIELDS = [
+    ("category", "category_confidence", "category"),
+    ("manufacturer", "manufacturer_confidence", "manufacturer"),
+    ("device_model", "device_model_confidence", "device_model"),
+    ("color", "color_confidence", "color"),
+]
+
+
+def apply_analysis(item, info: dict):
+    """
+    분석 결과를 비어 있는 칸에만 채운다 (습득자가 고른 값은 덮어쓰지 않음 = 사람 > AI).
+    확신도는 AI가 실제로 채운 항목에만 저장한다.
+    품목별 전용 항목(케이스, 지갑 종류 등)은 최종 품목에 해당할 때만 채운다
+    (습득자가 품목을 AI와 다르게 고른 경우 AI의 다른 품목 항목은 버림).
+    """
+    filled = []
+    scores = info.get("confidence_scores") or {}
+    for column, confidence_column, key in CONFIDENCE_FIELDS:
+        if getattr(item, column) is None and info.get(key) is not None:
+            setattr(item, column, info[key])
+            setattr(item, confidence_column, scores.get(key))
+            filled.append(column)
+
+    for column in (
+        "brand", "identification_level", "has_case", "has_card_wallet",
+        "earphone_components", "wallet_type", "material", "wallet_closure",
+    ):
+        if not check_form.column_allowed(column, item.category):
+            continue
+        if getattr(item, column) is None and info.get(column) is not None:
+            setattr(item, column, info[column])
+            filled.append(column)
+
+    for column in ("device_model_candidates", "verification_needed"):
+        if not getattr(item, column):
+            setattr(item, column, labels.dump_str_list(info.get(column)))
+
+    item.description = item.description or info.get("features")
+    item.field_sources = check_form.merge_sources(
+        item.field_sources, check_form.ai_sources(item, filled)
+    )
+    model = info.get("model") or REGISTRATION_ANALYZER_MODE
+    item.analysis_model = f"{REGISTRATION_ANALYZER_MODE}:{model}/{info.get('prompt_version') or '-'}"
+
+
 def analyze_registered_item(item_id: int):
     """등록된 습득물 사진을 분석해서 비어 있는 칸만 채우고 상태를 registered로 바꾼다."""
     db = SessionLocal()
@@ -716,20 +874,31 @@ def analyze_registered_item(item_id: int):
             return
 
         try:
-            with Image.open(item.image_path) as image:
-                rgb_image = image.convert("RGB")
-
+            image_file = resolve_image_path(item.image_path)
+            if image_file is None:
+                raise FileNotFoundError(f"이미지 파일 없음: {item.image_path}")
             if not item.embedding:
-                item.embedding = json.dumps(get_embedding(rgb_image))
+                # 검색 임베딩은 대표 사진 한 장 기준
+                item.embedding = json.dumps(get_embedding(open_image(image_file)))
 
-            info = extract_item_info(rgb_image)
+            # 등록 분석은 사진 전체(대표 사진 먼저)를 함께 본다
+            analysis_files = [image_file]
+            for extra in item.images or []:
+                extra_file = resolve_image_path(extra.image_path)
+                if extra_file is None:
+                    logger.warning("습득물 #%s 추가 사진 없음: %s", item_id, extra.image_path)
+                elif extra_file not in analysis_files:
+                    analysis_files.append(extra_file)
 
-            # 습득자가 직접 입력한 값은 덮어쓰지 않는다
-            item.category = item.category or info["category"]
-            item.color = item.color or info["color"]
-            item.brand = item.brand or info["brand"]
-            item.description = item.description or info["features"]
+            # 등록 전에 /items/analyze 결과를 이미 반영했다면(analysis_model 있음) 다시 호출하지 않는다
+            if item.analysis_model is None:
+                info = extract_item_info([open_image(f) for f in analysis_files])
+                apply_analysis(item, info)
             item.status = STATUS_REGISTERED
+        except AnalyzerConfigError as exc:
+            # API 키 누락 등 설정 문제: 스택트레이스 대신 해결 방법이 담긴 메시지만 남긴다
+            logger.error("습득물 #%s 자동 분석 불가: %s", item_id, exc)
+            item.status = STATUS_ANALYSIS_FAILED
         except Exception:
             logger.exception("습득물 #%s 자동 분석 실패", item_id)
             item.status = STATUS_ANALYSIS_FAILED
@@ -739,7 +908,44 @@ def analyze_registered_item(item_id: int):
         db.close()
 
 
+def backfill_missing_embeddings():
+    """
+    검색 임베딩이 비어 있는 등록 완료 물품의 임베딩을 계산해 저장한다.
+    (마이그레이션 v6이 EXIF 회전 반영 전 임베딩을 비운 경우 등)
+    """
+    db = SessionLocal()
+    try:
+        items = (
+            db.query(models.Item)
+            .filter(models.Item.embedding.is_(None))
+            .filter(models.Item.status == STATUS_REGISTERED)
+            .all()
+        )
+        done = 0
+        for item in items:
+            image_file = resolve_image_path(item.image_path)
+            if image_file is None:
+                continue
+            try:
+                item.embedding = json.dumps(get_embedding(open_image(image_file)))
+                db.commit()
+                done += 1
+            except Exception:
+                db.rollback()
+                logger.exception("습득물 #%s 임베딩 재계산 실패", item.id)
+        if items:
+            logger.warning("검색 임베딩 재계산: %d / %d건", done, len(items))
+    finally:
+        db.close()
+
+
 def _analysis_worker():
+    # 모델을 한 스레드에서만 쓰도록 분석 작업 전에 같은 스레드에서 처리한다
+    try:
+        backfill_missing_embeddings()
+    except Exception:
+        logger.exception("검색 임베딩 재계산 작업 오류")
+
     while True:
         item_id = _analysis_queue.get()
         try:
@@ -752,6 +958,23 @@ def _analysis_worker():
 
 @app.on_event("startup")
 def start_analysis_worker():
+    remote_status = {
+        "gemini": gemini_analyzer.config_status,
+        "baze": baze_analyzer.config_status,
+    }.get(REGISTRATION_ANALYZER_MODE)
+    if remote_status is not None:
+        status = remote_status()
+        if status["ready"]:
+            logger.warning(
+                "등록 분석: %s %s (프롬프트 %s)",
+                REGISTRATION_ANALYZER_MODE,
+                status["model"],
+                status["prompt_version"],
+            )
+        else:
+            # 서버는 계속 띄우고, 분석 요청만 명확한 에러로 실패시킨다
+            logger.error("등록 분석 비활성화 - %s", status["error"])
+
     threading.Thread(target=_analysis_worker, name="findyu-analysis", daemon=True).start()
 
     # 분석 도중 서버가 꺼졌던 항목은 다시 대기열에 넣는다
@@ -781,6 +1004,16 @@ def health_check():
         "query_llm_model": QUERY_LLM_MODEL_NAME,
         "registration_analyzer_mode": REGISTRATION_ANALYZER_MODE,
         "registration_vlm_model": VLM_MODEL_NAME,
+        "registration_gemini": (
+            gemini_analyzer.config_status()
+            if REGISTRATION_ANALYZER_MODE == "gemini"
+            else None
+        ),
+        "registration_baze": (
+            baze_analyzer.config_status()
+            if REGISTRATION_ANALYZER_MODE == "baze"
+            else None
+        ),
         "search_workflow": "LangGraph",
     }
 
@@ -793,8 +1026,8 @@ async def compare_images(
     img1_bytes = await image1.read()
     img2_bytes = await image2.read()
 
-    img1 = Image.open(io.BytesIO(img1_bytes)).convert("RGB")
-    img2 = Image.open(io.BytesIO(img2_bytes)).convert("RGB")
+    img1 = open_image(io.BytesIO(img1_bytes))
+    img2 = open_image(io.BytesIO(img2_bytes))
 
     emb1 = get_embedding(img1)
     emb2 = get_embedding(img2)
@@ -808,23 +1041,50 @@ async def compare_images(
 
 
 @app.post("/items/analyze")
-async def analyze_item_image(image: UploadFile = File(...)):
+async def analyze_item_image(
+    image: UploadFile = File(...),
+    extra_images: list[UploadFile] | None = File(None),  # 같은 물품의 다른 각도 사진 (선택)
+):
     """
-    습득물 사진을 등록하기 전에 VLM으로 종류/색상/브랜드/외형적 특징을 추출한다.
-    프론트엔드는 이 결과를 입력란에 자동 채우고, 사용자가 수정한 뒤 POST /items로 확정 등록한다.
+    습득물 사진(1장 이상)을 등록하기 전에 분석해 품명/색상/제조사/기종 등을 추출한다.
+    프론트엔드는 check_form으로 체크 폼을 미리 채우고(needs_check 항목 강조),
+    습득자가 확인한 뒤 analysis_id와 함께 POST /items로 등록한다.
     """
-    image_bytes = await image.read()
-    if not image_bytes:
+    pil_images = []
+    blobs = []
+    for upload in [image, *(extra_images or [])]:
+        if upload is None or not upload.filename:
+            continue
+        image_bytes = await upload.read()
+        if not image_bytes:
+            continue
+        blobs.append(image_bytes)
+        try:
+            pil_images.append(open_image(io.BytesIO(image_bytes)))
+        except Exception as exc:
+            raise HTTPException(
+                status_code=400, detail=f"invalid image file: {upload.filename}"
+            ) from exc
+
+    if not pil_images:
         raise HTTPException(status_code=400, detail="image is required")
+    if len(pil_images) > gemini_analyzer.MAX_IMAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"사진은 최대 {gemini_analyzer.MAX_IMAGES}장까지 분석할 수 있습니다.",
+        )
 
     try:
-        pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        # Gemini/VLM 호출은 오래 걸리므로 이벤트 루프를 막지 않게 스레드에서 실행
+        result = await run_in_threadpool(extract_item_info, pil_images)
+    except AnalyzerConfigError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except AnalyzerError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=400, detail="invalid image file") from exc
-
-    try:
-        result = extract_item_info(pil_image)
-    except Exception as exc:
+        logger.exception("등록 분석 실패")
         raise HTTPException(
             status_code=500,
             detail=f"Vision-Language analysis failed: {exc}",
@@ -839,10 +1099,29 @@ async def analyze_item_image(image: UploadFile = File(...)):
 
     result.pop("_raw_output", None)
 
+    form = check_form.build_check_form(result, image_count=len(pil_images))
+    analysis_id = _analysis_cache.put(result, check_form.image_digests(blobs))
+
     return {
         **result,
         "description": result["features"],
+        "analysis_id": analysis_id,
+        "check_form": form,
+        "photo_hint": form["photo_hint"],
     }
+
+
+@app.get("/form-schema")
+def get_form_schema(category: str = None):
+    """
+    품목별 체크 폼 항목과 선택지. category를 빼면 전 품목을 한 번에 준다.
+    모든 선택형 항목에 "모르겠음"이 있다 (등록: AI 값 사용 / 검색: 거르지 않음).
+    """
+    try:
+        normalized = check_form.validate_category(category)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return check_form.form_schema(normalized)
 
 
 @app.post("/items")
@@ -852,42 +1131,120 @@ async def register_item(
     color: str = Form(None),
     brand: str = Form(None),
     description: str = Form(None),
+    manufacturer: str = Form(None),
+    device_model: str = Form(None),
+    device_model_candidates: str = Form(None),  # JSON 배열 또는 쉼표 구분 문자열
+    identification_level: str = Form(None),     # 확인 / 추정 / 미확인
+    has_case: str = Form(None),                 # true / false (빈 값 = 판단 불가)
+    wallet_type: str = Form(None),              # 장지갑 / 반지갑 / 카드지갑
+    material: str = Form(None),
+    verification_needed: str = Form(None),      # JSON 배열 또는 쉼표 구분 문자열
     location: str = Form(None),
     occurred_at: str = Form(None),
-    image: UploadFile = File(...),
+    analysis_id: str = Form(None),              # /items/analyze 응답의 analysis_id (선택)
+    form_answers: str = Form(None),             # 체크 폼에서 사람이 고른 값 {"color": "검정", ...} (JSON)
+    image: UploadFile = File(...),                        # 대표 사진
+    extra_images: list[UploadFile] | None = File(None),   # 같은 물품의 다른 각도 사진 (선택)
     db: Session = Depends(get_db),
 ):
     if item_type not in {"found", "lost"}:
         raise HTTPException(status_code=400, detail="item_type must be 'found' or 'lost'")
 
-    image_bytes = await image.read()
-    if not image_bytes:
+    normalized_level = labels.normalize_identification_level(identification_level)
+    if identification_level and normalized_level is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"identification_level must be one of {list(labels.IDENTIFICATION_LEVELS)}",
+        )
+    normalized_wallet_type = labels.normalize_wallet_type(wallet_type)
+    if wallet_type and normalized_wallet_type is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"wallet_type must be one of {list(labels.WALLET_TYPES)}",
+        )
+
+    uploads = []  # (bytes, filename), 첫 번째가 대표 사진
+    for upload in [image, *(extra_images or [])]:
+        if upload is None or not upload.filename:
+            continue
+        image_bytes = await upload.read()
+        if not image_bytes:
+            continue
+        try:
+            with Image.open(io.BytesIO(image_bytes)) as check:
+                check.verify()
+        except Exception as exc:
+            raise HTTPException(
+                status_code=400, detail=f"invalid image file: {upload.filename}"
+            ) from exc
+        uploads.append((image_bytes, upload.filename))
+
+    if not uploads:
         raise HTTPException(status_code=400, detail="image is required")
+    if len(uploads) > gemini_analyzer.MAX_IMAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"사진은 최대 {gemini_analyzer.MAX_IMAGES}장까지 등록할 수 있습니다.",
+        )
 
+    # 같은 사진 묶음을 등록 전에 분석했다면 그 결과를 쓴다 (다른 사진이면 무시하고 등록 후 다시 분석)
+    cached_analysis = _analysis_cache.get(
+        analysis_id, check_form.image_digests([data for data, _ in uploads])
+    )
     try:
-        Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail="invalid image file") from exc
+        human = check_form.resolve_answers(
+            check_form.parse_answers(form_answers),
+            fallback_category=labels.normalize_category(category)
+            or (cached_analysis or {}).get("category"),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    saved_path = save_uploaded_image(image_bytes, image.filename)
+    # 검증을 모두 통과한 뒤에 저장한다 (중간에 실패해도 파일이 남지 않도록)
+    saved_paths = [save_uploaded_image(data, name) for data, name in uploads]
+    saved_path = saved_paths[0]
 
     # 임베딩·VLM 분석은 기다리지 않고 바로 응답한다 (analyze_registered_item 참고)
     new_item = models.Item(
         item_type=item_type,
-        category=category,
-        color=color,
+        category=labels.normalize_category(category),
+        color=labels.normalize_color(color),
         brand=brand,
         description=description,
+        manufacturer=(manufacturer or "").strip() or None,
+        device_model=(device_model or "").strip() or None,
+        device_model_candidates=labels.dump_str_list(device_model_candidates),
+        identification_level=normalized_level,
+        has_case=labels.parse_optional_bool(has_case),
+        wallet_type=normalized_wallet_type,
+        material=labels.normalize_material(material),
+        verification_needed=labels.dump_str_list(verification_needed),
         image_path=saved_path,
         location=location,
         occurred_at=parse_optional_datetime(occurred_at),
         status=STATUS_ANALYZING,
+        images=[
+            models.ItemImage(image_path=path, position=position)
+            for position, path in enumerate(saved_paths)
+        ],
     )
+
+    # 우선순위: 체크 폼에서 사람이 고른 값 > 기존 입력란 값 > AI 값 (apply_analysis는 빈 칸만 채움)
+    sources = check_form.apply_human(new_item, human, cached_analysis)
+    legacy_human = {
+        key: check_form.SOURCE_HUMAN
+        for key, value in (("category", category), ("color", color), ("brand", manufacturer or brand))
+        if value and key not in sources
+    }
+    new_item.field_sources = check_form.merge_sources(None, legacy_human, sources)
+    if cached_analysis is not None:
+        apply_analysis(new_item, cached_analysis)
 
     db.add(new_item)
     db.commit()
     db.refresh(new_item)
 
+    # 검색 임베딩 계산 (분석 결과가 없으면 AI 분석도 함께)
     _analysis_queue.put(new_item.id)
 
     return serialize_item(new_item)
@@ -914,10 +1271,16 @@ async def search_items(
     occurred_at: str = Form(None),
     image: UploadFile = File(None),
     top_k: int = Form(5),
+    category: str = Form(None),   # 체크 폼 품목 (스마트폰/이어폰/지갑/기타/모르겠음)
+    filters: str = Form(None),    # 체크 폼에서 분실자가 고른 값 {"color": "검정", ...} (JSON)
     db: Session = Depends(get_db),
 ):
     """
     AI 브랜치의 핵심 검색 구조를 demo FastAPI/SQLite에 통합.
+
+    체크 폼 필터: 분실자가 체크한 항목(category, filters)과 값이 다른 습득물은 후보에서 뺀다.
+    습득물 쪽 값이 비어 있으면(모름) 빼지 않고 filter_check에 "미확인"으로 표시한다.
+    순위는 남은 후보를 아래 점수로 매긴다.
 
     - Image -> Image: DINOv2
     - Text -> Image: SigLIP2
@@ -927,12 +1290,17 @@ async def search_items(
     """
     top_k = max(1, min(int(top_k), 20))
 
+    try:
+        filter_category, form_filters = check_form.parse_filters(category, filters)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     query_image_embedding = None
     if image is not None and image.filename:
         image_bytes = await image.read()
         if image_bytes:
             try:
-                query_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+                query_image = open_image(io.BytesIO(image_bytes))
                 query_image_embedding = get_embedding(query_image)
             except Exception as exc:
                 raise HTTPException(status_code=400, detail="invalid search image") from exc
@@ -975,12 +1343,22 @@ async def search_items(
     # Query LLM의 자연어 time은 현재 prototype에서 임의 날짜로 해석하지 않는다.
     query_time = parse_optional_datetime(occurred_at)
 
-    candidates = (
+    all_candidates = (
         db.query(models.Item)
         .filter(models.Item.item_type == "found")
         .filter(models.Item.status != STATUS_ANALYSIS_FAILED)
         .all()
     )
+    filter_checks = {}
+    candidates = []
+    for item in all_candidates:
+        checked = check_form.match_filters(item, filter_category, form_filters)
+        if checked is not None:
+            filter_checks[item.id] = checked
+            candidates.append(item)
+
+    def serialize_with_filters(item):
+        return {**serialize_item(item), "filter_check": filter_checks.get(item.id, {})}
 
     def candidate_image_score(item, query_vector):
         candidate_vector = item_embedding(item)
@@ -998,7 +1376,7 @@ async def search_items(
         get_candidate_text_image_embedding=candidate_text_score,
         location_score_fn=location_similarity,
         time_score_fn=time_similarity,
-        serialize_fn=serialize_item,
+        serialize_fn=serialize_with_filters,
         query_location=effective_location,
         query_time=query_time,
         top_k=top_k,
@@ -1018,6 +1396,11 @@ async def search_items(
         "scoring_mode": "dinov2+siglip2+metadata+langgraph",
         "image_model": MODEL_NAME,
         "text_image_model": TEXT_IMAGE_MODEL_NAME,
+        "applied_filters": {
+            **({"category": filter_category} if filter_category else {}),
+            **{fld.key: fld.choice_from_column(value) or value for fld, value in form_filters},
+        },
+        "total_found_items": len(all_candidates),
         "total_candidates": len(candidates),
-        "results": graph_result.get("results", []),
+        "results": graph_result.get("results", []) if candidates else [],
     }

@@ -373,6 +373,68 @@ main {
   object-fit: contain;
 }
 
+.thumb-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.thumb {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #d6deea;
+  border-radius: 12px;
+  background: #f7f9fc;
+}
+
+.thumb.primary {
+  border: 2px solid #1d4f9f;
+}
+
+.thumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.thumb-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: #1d4f9f;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.thumb-actions {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+}
+
+.thumb-actions button {
+  flex: 1;
+  border: 0;
+  border-radius: 7px;
+  padding: 4px 0;
+  background: white;
+  color: #5e6e86;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.thumb-actions button:hover {
+  background: #eef4ff;
+  color: #1d4f9f;
+}
+
 .integration-note {
   display: grid;
   gap: 4px;
@@ -687,6 +749,138 @@ main {
   border-top: 1px solid #e0e6ef;
   padding: 22px clamp(20px, 5vw, 72px);
   color: #8a95a7;
+  font-size: 12px;
+}
+
+/* ---------------------------------------------------------
+   품목별 체크 폼
+   --------------------------------------------------------- */
+.check-fields {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.check-field {
+  display: grid;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  padding: 10px 12px;
+  background: #fbfcfe;
+}
+
+.check-field.needs-check {
+  border-color: #f5b941;
+  background: #fff8e6;
+}
+
+.check-field-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.check-badge {
+  border-radius: 999px;
+  padding: 2px 9px;
+  background: #f5b941;
+  color: #5c3b00;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.check-done {
+  color: #1d4f9f;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #d8e0ec;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: white;
+  color: #21324f;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.chip:hover {
+  border-color: #72a0ec;
+}
+
+.chip.unknown {
+  color: #7a8599;
+}
+
+.chip.selected {
+  border-color: #1f5fd1;
+  background: #1f5fd1;
+  color: white;
+}
+
+.chip-ai {
+  border-radius: 6px;
+  padding: 0 5px;
+  background: #e3ecff;
+  color: #1d4f9f;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.chip.selected .chip-ai {
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
+}
+
+.check-text {
+  width: 100%;
+  border: 1px solid #d8e0eb;
+  border-radius: 11px;
+  padding: 10px 12px;
+  outline: none;
+  background: white;
+  color: #182742;
+}
+
+.check-text:focus {
+  border-color: #72a0ec;
+  box-shadow: 0 0 0 3px rgba(31, 95, 209, 0.1);
+}
+
+.photo-hint {
+  display: grid;
+  gap: 4px;
+  margin-top: 16px;
+  border: 1px solid #f5b941;
+  border-radius: 13px;
+  padding: 12px 14px;
+  background: #fff8e6;
+}
+
+.photo-hint strong {
+  color: #8a5a00;
+  font-size: 13px;
+}
+
+.photo-hint span {
+  color: #5c4a20;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.filter-unknown {
+  color: #8a5a00;
   font-size: 12px;
 }
 

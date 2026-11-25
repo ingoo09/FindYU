@@ -3,7 +3,8 @@ DB 테이블(모델) 정의.
 분실물/습득물을 같은 테이블에 저장하고, item_type으로 구분함.
 """
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, DateTime, Text
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
 
@@ -22,8 +23,34 @@ class Item(Base):
     brand = Column(String, nullable=True)           # 브랜드
     description = Column(Text, nullable=True)       # 자유 설명 텍스트
 
+    # 휴대폰·지갑 전용 필드 (허용값은 labels.py 참고)
+    # 새 컬럼을 추가하면 migrations.py에 컬럼 추가 단계도 새로 만들어야 기존 DB에 반영됨
+    device_model = Column(String, nullable=True)             # 기종 (예: 아이폰 15 Pro)
+    device_model_candidates = Column(Text, nullable=True)    # 기종 대안 후보 (JSON 배열)
+    identification_level = Column(String, nullable=True)     # 확인 / 추정 / 미확인
+    has_case = Column(Boolean, nullable=True)                # 케이스 유무 (이어폰은 보호 커버, NULL=판단 불가)
+    has_card_wallet = Column(Boolean, nullable=True)         # 스마트폰 카드지갑 부착 (v7)
+    earphone_components = Column(String, nullable=True)      # 케이스+이어버드 / 케이스만 / 이어버드만 (v7)
+    wallet_closure = Column(String, nullable=True)           # 지퍼 / 똑딱이 / 없음 (v7)
+    wallet_type = Column(String, nullable=True)              # 장지갑 / 반지갑 / 카드지갑
+    material = Column(String, nullable=True)                 # 소재
+    verification_needed = Column(Text, nullable=True)        # 추가 확인 필요 사항 (JSON 배열)
+    manufacturer = Column(String, nullable=True)             # 제조사 (brand와 다를 수 있음)
+
+    # AI 확신도 (높음 0.9 / 보통 0.6 / 낮음 0.3). AI가 채운 값에만 저장, 사람이 입력한 값은 NULL
+    category_confidence = Column(Float, nullable=True)
+    manufacturer_confidence = Column(Float, nullable=True)
+    device_model_confidence = Column(Float, nullable=True)
+    color_confidence = Column(Float, nullable=True)
+
+    # 체크 폼 항목별 출처 {"color": "human", "has_case": "ai", ...} (JSON, v7)
+    field_sources = Column(Text, nullable=True)
+    # 자동 분석에 쓴 모델·프롬프트 (예: "baze:gemini-3.5-flash/v1.3"). NULL이면 아직 분석 전 (v7)
+    analysis_model = Column(String, nullable=True)
+
     # 이미지
-    image_path = Column(String, nullable=True)      # 서버에 저장된 이미지 경로
+    # image_path는 대표 사진(검색 임베딩 기준). 등록된 사진 전체는 images(item_images 테이블)
+    image_path = Column(String, nullable=True)      # 서버에 저장된 대표 이미지 경로
     embedding = Column(Text, nullable=True)          # 임베딩 벡터 (JSON 문자열로 저장)
 
     # 위치·시간
@@ -33,4 +60,24 @@ class Item(Base):
     # 등록 상태
     status = Column(String, default="registered")    # registered, matched 등
 
+    created_at = Column(DateTime, server_default=func.now())
+
+    images = relationship(
+        "ItemImage",
+        order_by="ItemImage.position",
+        cascade="all, delete-orphan",
+        passive_deletes=True,  # 삭제는 DB의 ON DELETE CASCADE에 맡김 (database.py 외래키 설정)
+        lazy="selectin",  # 목록 조회 시 N+1 쿼리 방지
+    )
+
+
+class ItemImage(Base):
+    """한 물품의 사진 여러 장 (예: 후면·전면·측면). position 0이 대표 사진."""
+
+    __tablename__ = "item_images"
+
+    id = Column(Integer, primary_key=True, index=True)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False, index=True)
+    image_path = Column(String, nullable=False)       # uploads/<파일명>
+    position = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, server_default=func.now())

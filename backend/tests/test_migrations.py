@@ -1,0 +1,235 @@
+import shutil
+import sqlite3
+from pathlib import Path
+
+import pytest
+
+import migrations
+
+LEGACY_SCHEMA = """
+CREATE TABLE items (
+    id INTEGER NOT NULL,
+    item_type VARCHAR NOT NULL,
+    category VARCHAR,
+    color VARCHAR,
+    brand VARCHAR,
+    description TEXT,
+    image_path VARCHAR,
+    embedding TEXT,
+    location VARCHAR,
+    occurred_at DATETIME,
+    status VARCHAR,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+"""
+
+LEGACY_ROWS = [
+    (1, "found", "이어폰 케이스", "흰색, 검은색", "모르겠음", "토끼 그림", "uploads/a.jpeg", "[0.1, 0.2]", "IT관(E21)", None, "registered"),
+    (2, "found", "무선 이어폰", "흰색", "삼성", "키가 달려 있음", "uploads\\b.jpg", "[0.3]", "IT관(E21)", None, "registered"),
+    (3, "found", "가방", "검은색", "SQ", None, "uploads\\c.jpg", None, None, None, "registered"),
+]
+
+
+@pytest.fixture
+def legacy_db(tmp_path) -> Path:
+    db_path = tmp_path / "findyu.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript(LEGACY_SCHEMA)
+    conn.executemany(
+        "INSERT INTO items (id, item_type, category, color, brand, description, image_path,"
+        " embedding, location, occurred_at, status) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        LEGACY_ROWS,
+    )
+    conn.commit()
+    conn.close()
+    return db_path
+
+
+def _rows(db_path, columns):
+    conn = sqlite3.connect(db_path)
+    try:
+        return conn.execute(f"SELECT {', '.join(columns)} FROM items ORDER BY id").fetchall()
+    finally:
+        conn.close()
+
+
+def _columns(db_path):
+    conn = sqlite3.connect(db_path)
+    try:
+        return [row[1] for row in conn.execute("PRAGMA table_info(items)")]
+    finally:
+        conn.close()
+
+
+def test_migrates_legacy_db(legacy_db):
+    applied = migrations.run_migrations(legacy_db)
+
+    assert applied == [v for v, _ in migrations.MIGRATIONS]
+    assert migrations.get_version(legacy_db) == migrations.LATEST_VERSION
+
+    columns = _columns(legacy_db)
+    for name, _ in migrations.NEW_COLUMNS + migrations.V4_COLUMNS:
+        assert name in columns
+
+    # 역슬래시 경로 정규화
+    assert [r[0] for r in _rows(legacy_db, ["image_path"])] == [
+        "uploads/a.jpeg", "uploads/b.jpg", "uploads/c.jpg",
+    ]
+
+    # 데이터 손실 없음: 행 수, 임베딩, 위치, 설명 유지
+    assert _rows(legacy_db, ["id", "embedding", "location", "description", "status"]) == [
+        (r[0], r[7], r[8], r[5], r[10]) for r in LEGACY_ROWS
+    ]
+
+    # 라벨 정규화
+    assert _rows(legacy_db, ["category", "color"]) == [
+        ("이어폰", "다색"), ("이어폰", "흰색"), ("기타", "검정"),
+    ]
+
+    # 새 컬럼은 비어 있음
+    assert _rows(legacy_db, [name for name, _ in migrations.NEW_COLUMNS])[0] == (None,) * len(migrations.NEW_COLUMNS)
+
+
+def test_creates_backup_only_when_needed(legacy_db):
+    migrations.run_migrations(legacy_db)
+    backups = list(legacy_db.parent.glob("findyu.db.bak-*"))
+    assert len(backups) == 1
+    # 백업은 마이그레이션 전 상태
+    assert migrations.get_version(backups[0]) == 0
+    assert "device_model" not in _columns(backups[0])
+
+    # 두 번째 실행은 아무 것도 하지 않고 백업도 만들지 않음
+    assert migrations.run_migrations(legacy_db) == []
+    assert len(list(legacy_db.parent.glob("findyu.db.bak-*"))) == 1
+
+
+def test_idempotent_data(legacy_db):
+    migrations.run_migrations(legacy_db)
+    before = _rows(legacy_db, ["*"])
+    migrations.run_migrations(legacy_db)
+    assert _rows(legacy_db, ["*"]) == before
+
+
+def test_failed_step_rolls_back(legacy_db, monkeypatch):
+    def boom(conn):
+        conn.execute("UPDATE items SET color = 'XXX'")
+        raise RuntimeError("fail")
+
+    monkeypatch.setattr(
+        migrations, "MIGRATIONS", migrations.MIGRATIONS + [(migrations.LATEST_VERSION + 1, boom)]
+    )
+    with pytest.raises(RuntimeError):
+        migrations.run_migrations(legacy_db)
+
+    # 실패한 단계 이전까지만 적용되고, 실패한 단계의 변경은 롤백됨
+    assert migrations.get_version(legacy_db) == migrations.LATEST_VERSION
+    assert "XXX" not in [r[0] for r in _rows(legacy_db, ["color"])]
+
+
+def test_empty_new_db_no_backup(tmp_path):
+    db_path = tmp_path / "findyu.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript(LEGACY_SCHEMA)
+    conn.close()
+
+    migrations.run_migrations(db_path)
+    assert not list(tmp_path.glob("findyu.db.bak-*"))
+    assert migrations.get_version(db_path) == migrations.LATEST_VERSION
+
+
+def test_real_findyu_db_copy(tmp_path):
+    """저장소의 실제 findyu.db 복사본으로 검증 (원본은 건드리지 않음)."""
+    src = Path(__file__).resolve().parents[1] / "findyu.db"
+    if not src.exists():
+        pytest.skip("findyu.db 없음")
+    db_path = tmp_path / "findyu.db"
+    shutil.copy(src, db_path)
+
+    before_count = _rows(db_path, ["COUNT(*)"])[0][0]
+    before_embeddings = _rows(db_path, ["id", "embedding"])
+
+    migrations.run_migrations(db_path)
+
+    assert _rows(db_path, ["COUNT(*)"])[0][0] == before_count
+    # 임베딩은 그대로이거나, EXIF 회전 사진이라 재계산 대상으로 비워졌어야 함 (v6)
+    after_embeddings = dict(_rows(db_path, ["id", "embedding"]))
+    for item_id, embedding in before_embeddings:
+        assert after_embeddings[item_id] in (embedding, None)
+    assert all("\\" not in (r[0] or "") for r in _rows(db_path, ["image_path"]))
+
+    import labels
+    for category, color in _rows(db_path, ["category", "color"]):
+        assert category is None or category in labels.CATEGORIES
+        assert color is None or color in labels.COLORS
+
+
+def test_item_images_backfilled_once(legacy_db):
+    migrations.run_migrations(legacy_db)
+    conn = sqlite3.connect(legacy_db)
+    try:
+        rows = conn.execute(
+            "SELECT item_id, image_path, position FROM item_images ORDER BY item_id"
+        ).fetchall()
+    finally:
+        conn.close()
+    assert rows == [
+        (1, "uploads/a.jpeg", 0), (2, "uploads/b.jpg", 0), (3, "uploads/c.jpg", 0),
+    ]
+
+    # 다시 실행해도 중복으로 채우지 않음 (user_version을 되돌려 v5를 강제로 재실행)
+    conn = sqlite3.connect(legacy_db)
+    conn.execute("PRAGMA user_version = 4")
+    conn.commit()
+    conn.close()
+    migrations.run_migrations(legacy_db)
+    conn = sqlite3.connect(legacy_db)
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM item_images").fetchone()[0] == 3
+    finally:
+        conn.close()
+
+
+def test_rotated_image_embeddings_cleared(legacy_db, tmp_path, monkeypatch):
+    """EXIF 회전 사진(b.jpg)의 임베딩만 비우고, 정상 사진(c.jpg)·파일 없는 사진(a.jpeg)은 유지."""
+    from PIL import Image
+
+    import paths
+
+    uploads = tmp_path / "uploads"
+    uploads.mkdir()
+    rotated = Image.new("RGB", (40, 30), "red")
+    exif = rotated.getexif()
+    exif[0x0112] = 6
+    rotated.save(uploads / "b.jpg", exif=exif)
+    Image.new("RGB", (40, 30), "blue").save(uploads / "c.jpg")
+    monkeypatch.setattr(paths, "UPLOAD_DIR", uploads)
+
+    conn = sqlite3.connect(legacy_db)
+    conn.execute("UPDATE items SET embedding = '[0.5]' WHERE id = 3")
+    conn.commit()
+    conn.close()
+
+    migrations.run_migrations(legacy_db)
+
+    assert _rows(legacy_db, ["id", "embedding"]) == [
+        (1, "[0.1, 0.2]"),  # 파일 없음 → 유지
+        (2, None),          # 회전 정보 있음 → 재계산 대상
+        (3, "[0.5]"),       # 회전 정보 없음 → 유지
+    ]
+
+
+def test_v7_adds_check_form_columns_and_moves_earphones(legacy_db):
+    """v6까지 적용된 DB(품명 '기타'에 이어폰이 섞여 있음) → v7에서 설명으로 이어폰 재분류."""
+    migrations.run_migrations(legacy_db)
+    conn = sqlite3.connect(legacy_db)
+    conn.execute("UPDATE items SET category = '기타'")
+    conn.execute("UPDATE items SET description = '갤럭시 버즈2 프로' WHERE id = 1")
+    conn.execute("UPDATE items SET description = NULL, brand = '에어팟' WHERE id = 2")
+    conn.execute("PRAGMA user_version = 6")
+    conn.commit()
+    conn.close()
+
+    assert migrations.run_migrations(legacy_db) == [7]
+    assert {name for name, _ in migrations.V7_COLUMNS} <= set(_columns(legacy_db))
+    assert _rows(legacy_db, ["category"]) == [("이어폰",), ("이어폰",), ("기타",)]

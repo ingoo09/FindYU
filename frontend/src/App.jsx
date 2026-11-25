@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+const MAX_REGISTER_IMAGES = 5; // 백엔드 gemini_analyzer.MAX_IMAGES와 같게 유지
 
 function apiUrl(path) {
   return `${API_BASE}${path}`;
@@ -73,8 +74,12 @@ function Metric({ label, value }) {
   );
 }
 
-function CandidateCard({ candidate, onSelect }) {
+function CandidateCard({ candidate, labels = {}, onSelect }) {
   const image = assetUrl(candidate.image_url);
+  // 체크한 항목 중 습득물 쪽 값을 몰라서 거르지 못한 항목
+  const unknown = Object.entries(candidate.filter_check || {})
+    .filter(([, result]) => result === "미확인")
+    .map(([key]) => labels[key] || key);
 
   return (
     <button className="candidate-card" type="button" onClick={() => onSelect(candidate)}>
@@ -90,12 +95,13 @@ function CandidateCard({ candidate, onSelect }) {
         <strong>{candidate.category || "분류 미지정"}</strong>
         <span>{[candidate.color, candidate.brand].filter(Boolean).join(" · ") || "상세 정보 없음"}</span>
         <span>{candidate.location || "장소 미입력"}</span>
+        {unknown.length ? <span className="filter-unknown">확인 필요: {unknown.join(", ")}</span> : null}
       </div>
     </button>
   );
 }
 
-function MatchDashboard({ candidate, onClose }) {
+function MatchDashboard({ candidate, labels = {}, onClose }) {
   if (!candidate) return null;
 
   const image = assetUrl(candidate.image_url);
@@ -143,14 +149,15 @@ function MatchDashboard({ candidate, onClose }) {
       </div>
 
       <div className="dashboard-meta">
-        <div>
-          <span>색상</span>
-          <strong>{candidate.color || "미입력"}</strong>
-        </div>
-        <div>
-          <span>브랜드</span>
-          <strong>{candidate.brand || "미입력"}</strong>
-        </div>
+        {Object.entries(candidate.form_values || {}).map(([key, value]) => (
+          <div key={key}>
+            <span>
+              {labels[key] || key}
+              {candidate.field_sources?.[key] === "human" ? " (직접 입력)" : ""}
+            </span>
+            <strong>{value}</strong>
+          </div>
+        ))}
         <div>
           <span>습득 장소</span>
           <strong>{candidate.location || "미입력"}</strong>
@@ -164,7 +171,136 @@ function MatchDashboard({ candidate, onClose }) {
   );
 }
 
-function RegisteredItemStatus({ item }) {
+// ---------------------------------------------------------
+// 품목별 체크 폼 (GET /form-schema). 등록·검색 화면이 같은 항목을 쓴다.
+// "모르겠음" = 답하지 않음 (등록: AI 값 사용 / 검색: 그 항목으로 거르지 않음)
+// ---------------------------------------------------------
+const UNKNOWN = "모르겠음";
+
+function useFormSchema() {
+  const [schema, setSchema] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetch(apiUrl("/form-schema"))
+      .then((response) => {
+        if (!response.ok) throw new Error("form-schema");
+        return response.json();
+      })
+      .then((data) => {
+        if (active) setSchema(data);
+      })
+      .catch(() => {
+        if (active) setError("체크 항목을 불러오지 못했습니다. 백엔드 연결을 확인해주세요.");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return [schema, error];
+}
+
+function fieldsFor(schema, category) {
+  if (!schema || !category || category === UNKNOWN) return [];
+  return schema.forms?.[category] || [];
+}
+
+function emptyAnswers(schema, category = UNKNOWN) {
+  const answers = { category };
+  fieldsFor(schema, category).forEach((field) => {
+    answers[field.key] = UNKNOWN;
+  });
+  return answers;
+}
+
+function fieldLabelMap(schema) {
+  const map = { category: "품목" };
+  Object.values(schema?.forms || {}).forEach((fields) =>
+    fields.forEach((field) => {
+      map[field.key] = field.label;
+    })
+  );
+  return map;
+}
+
+function ChipGroup({ label, options, value, aiValue, onSelect }) {
+  return (
+    <div className="chip-group" role="radiogroup" aria-label={label}>
+      {options.map((option) => {
+        const selected = value === option;
+        return (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            className={`chip ${selected ? "selected" : ""} ${option === UNKNOWN ? "unknown" : ""}`}
+            onClick={() => onSelect(option)}
+          >
+            {option}
+            {aiValue === option && option !== UNKNOWN ? <span className="chip-ai">AI</span> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// fields: [{key, label, type, options, help}], ai: {key: {ai_value, needs_check, check_reasons, suggestions}}
+function CheckFields({ fields, values, onChange, ai = {}, touched = {} }) {
+  return (
+    <div className="check-fields">
+      {fields.map((field) => {
+        const info = ai[field.key];
+        const highlight = Boolean(info?.needs_check) && !touched[field.key];
+        const value = values[field.key] ?? UNKNOWN;
+        const hint = highlight && info.check_reasons?.length ? info.check_reasons.join(" · ") : field.help;
+
+        return (
+          <div key={field.key} className={`check-field ${highlight ? "needs-check" : ""}`}>
+            <div className="check-field-head">
+              <span className="field-label">{field.label}</span>
+              {highlight ? <span className="check-badge">확인해주세요</span> : null}
+              {touched[field.key] && info ? <span className="check-done">직접 선택</span> : null}
+            </div>
+
+            {field.type === "text" ? (
+              <>
+                <input
+                  className="check-text"
+                  value={value === UNKNOWN ? "" : value}
+                  placeholder="모르면 비워 두세요"
+                  onChange={(event) => onChange(field.key, event.target.value.trim() ? event.target.value : UNKNOWN)}
+                />
+                <ChipGroup
+                  label={`${field.label} 후보`}
+                  options={[...new Set([...(info?.suggestions || []), UNKNOWN])]}
+                  value={value}
+                  aiValue={info?.ai_value}
+                  onSelect={(option) => onChange(field.key, option)}
+                />
+              </>
+            ) : (
+              <ChipGroup
+                label={field.label}
+                options={field.options}
+                value={value}
+                aiValue={info?.ai_value}
+                onSelect={(option) => onChange(field.key, option)}
+              />
+            )}
+
+            {hint ? <span className="field-hint">{hint}</span> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RegisteredItemStatus({ item, labels }) {
   if (item.status === "analyzing") {
     return (
       <div className="form-message success">
@@ -181,34 +317,117 @@ function RegisteredItemStatus({ item }) {
     );
   }
 
-  const filled = [
-    ["종류", item.category],
-    ["색상", item.color],
-    ["브랜드", item.brand],
-    ["특징", item.description],
-  ].filter(([, value]) => value);
+  const filled = Object.entries(item.form_values || {}).filter(([, value]) => value && value !== UNKNOWN);
 
   return (
     <div className="form-message success">
-      습득물 #{item.id} AI 분석 완료: {filled.map(([label, value]) => `${label} ${value}`).join(" · ")}
+      습득물 #{item.id} 등록 완료:{" "}
+      {filled.map(([key, value]) => `${labels[key] || key} ${value}`).join(" · ") || "항목 정보 없음"}
     </div>
   );
 }
 
+function imagesKeyOf(images) {
+  // 대표 사진만 바꾸는 것은 같은 사진 묶음으로 본다 (서버도 순서와 무관하게 비교)
+  return images
+    .map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`)
+    .sort()
+    .join("|");
+}
+
 function RegisterView({ onGoSearch }) {
-  const [form, setForm] = useState({
-    category: "",
-    color: "",
-    brand: "",
-    description: "",
-    location: "",
-    occurredAt: "",
-  });
-  const [image, setImage] = useState(null);
-  const [preview, setPreview] = useState(null);
+  const [schema, schemaError] = useFormSchema();
+  const schemaRef = useRef(null);
+  schemaRef.current = schema;
+  const [form, setForm] = useState({ description: "", location: "", occurredAt: "" });
+  // 첫 번째 사진이 대표 사진(검색 기준). 나머지는 AI 분석에 함께 사용된다.
+  const [images, setImages] = useState([]); // [{ file, url }]
+  const [answers, setAnswers] = useState({ category: UNKNOWN });
+  const [touched, setTouched] = useState({});
+  const touchedRef = useRef({});
+  const [analysis, setAnalysis] = useState({ status: "idle", data: null, imagesKey: "" });
   const [state, setState] = useState({ loading: false, message: "", error: false });
   const [registered, setRegistered] = useState(null);
   const [fileInputKey, setFileInputKey] = useState(0);
+
+  const imagesKey = useMemo(() => imagesKeyOf(images), [images]);
+  const labels = useMemo(() => fieldLabelMap(schema), [schema]);
+  const checkForm = analysis.status === "done" ? analysis.data.check_form : null;
+  const aiCategory = checkForm?.category.ai_value;
+
+  // AI 값은 현재 품목이 AI가 고른 품목일 때만 항목에 표시한다
+  const aiInfo = useMemo(() => {
+    if (!checkForm) return {};
+    const info = { category: checkForm.category };
+    if (answers.category === aiCategory) {
+      checkForm.fields.forEach((field) => {
+        info[field.key] = field;
+      });
+    }
+    return info;
+  }, [checkForm, aiCategory, answers.category]);
+
+  function markTouched(key) {
+    touchedRef.current = { ...touchedRef.current, [key]: true };
+    setTouched(touchedRef.current);
+  }
+
+  function resetChecks() {
+    touchedRef.current = {};
+    setTouched({});
+    setAnswers({ category: UNKNOWN });
+    setAnalysis({ status: "idle", data: null, imagesKey: "" });
+  }
+
+  // 사진이 바뀌면 잠시 뒤 AI 분석을 요청하고, 결과로 체크 폼을 미리 채운다 (사람이 고른 항목은 유지)
+  useEffect(() => {
+    if (!images.length) {
+      setAnalysis({ status: "idle", data: null, imagesKey: "" });
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setAnalysis({ status: "loading", data: null, imagesKey });
+      const body = new FormData();
+      body.append("image", images[0].file);
+      images.slice(1).forEach((item) => body.append("extra_images", item.file));
+
+      try {
+        const response = await fetch(apiUrl("/items/analyze"), {
+          method: "POST",
+          body,
+          signal: controller.signal,
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "AI 분석에 실패했습니다.");
+
+        setAnalysis({ status: "done", data, imagesKey });
+        const form = data.check_form;
+        setAnswers((current) => {
+          const done = touchedRef.current;
+          const category = done.category ? current.category : form.category.ai_value;
+          const next = { category };
+          const aiFields = category === form.category.ai_value ? form.fields : [];
+          fieldsFor(schemaRef.current, category).forEach((field) => {
+            const ai = aiFields.find((item) => item.key === field.key);
+            next[field.key] = done[field.key] ? current[field.key] ?? UNKNOWN : ai?.ai_value ?? UNKNOWN;
+          });
+          return next;
+        });
+      } catch (error) {
+        if (error.name === "AbortError") return;
+        setAnalysis({ status: "error", data: null, imagesKey, message: error.message });
+      }
+    }, 900);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+    // 사진 묶음이 바뀔 때만 다시 분석한다 (대표 사진 순서 변경은 제외)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imagesKey]);
 
   // 등록 후 이 화면에 남아 있는 동안만 분석 결과를 확인한다.
   // 화면을 나가도 서버에서 분석은 계속되고 결과는 자동으로 등록된다.
@@ -232,26 +451,99 @@ function RegisterView({ onGoSearch }) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function handleImage(file) {
-    setImage(file || null);
-    setPreview(file ? URL.createObjectURL(file) : null);
+  function changeAnswer(key, value) {
+    markTouched(key);
+    if (key !== "category") {
+      setAnswers((current) => ({ ...current, [key]: value }));
+      return;
+    }
+
+    // 품목을 바꾸면 그 품목의 항목으로 바꾼다. 공통 항목(색상 등)과 직접 고른 값은 유지
+    setAnswers((current) => {
+      const next = { category: value };
+      const aiFields = checkForm && value === aiCategory ? checkForm.fields : [];
+      fieldsFor(schema, value).forEach((field) => {
+        const ai = aiFields.find((item) => item.key === field.key);
+        if (touchedRef.current[field.key] && current[field.key] !== undefined) next[field.key] = current[field.key];
+        else if (ai) next[field.key] = ai.ai_value;
+        else next[field.key] = current[field.key] ?? UNKNOWN;
+      });
+      return next;
+    });
+  }
+
+  function addImages(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+
+    const isDuplicate = (file) =>
+      images.some((item) => item.file.name === file.name && item.file.size === file.size);
+    const fresh = files.filter((file) => !isDuplicate(file));
+    const room = MAX_REGISTER_IMAGES - images.length;
+    const accepted = fresh.slice(0, Math.max(0, room));
+
+    if (fresh.length > accepted.length) {
+      setState({
+        loading: false,
+        message: `사진은 최대 ${MAX_REGISTER_IMAGES}장까지 등록할 수 있습니다.`,
+        error: true,
+      });
+    }
+
+    setImages([...images, ...accepted.map((file) => ({ file, url: URL.createObjectURL(file) }))]);
+    // 같은 파일을 다시 고를 수 있도록 input 초기화
+    setFileInputKey((key) => key + 1);
+  }
+
+  function removeImage(index) {
+    setImages((current) => {
+      URL.revokeObjectURL(current[index].url);
+      return current.filter((_, i) => i !== index);
+    });
+  }
+
+  function makePrimary(index) {
+    setImages((current) => [current[index], ...current.filter((_, i) => i !== index)]);
+  }
+
+  function clearImages() {
+    images.forEach((item) => URL.revokeObjectURL(item.url));
+    setImages([]);
+  }
+
+  function buildFormAnswers(useAnalysis) {
+    // AI 분석을 쓰는 경우: 사람이 직접 고른 항목만 보낸다 (나머지는 서버가 AI 값으로 채움)
+    // AI 분석이 없는 경우: 선택된 값은 모두 사람이 고른 값이다
+    const keys = ["category", ...fieldsFor(schema, answers.category).map((field) => field.key)];
+    const result = {};
+    keys.forEach((key) => {
+      const value = answers[key];
+      if (!value || value === UNKNOWN) return;
+      if (useAnalysis && !touched[key]) return;
+      result[key] = value;
+    });
+    // 항목은 품목별로 다르므로, 품목을 AI에 맡기지 않는 경우 품목을 함께 보낸다
+    if (!useAnalysis && Object.keys(result).length && !result.category) return {};
+    return result;
   }
 
   async function submit(event) {
     event.preventDefault();
 
-    if (!image) {
+    if (!images.length) {
       setState({ loading: false, message: "습득물 사진을 선택해주세요.", error: true });
       return;
     }
 
+    const useAnalysis = analysis.status === "done" && analysis.imagesKey === imagesKey;
     const body = new FormData();
     body.append("item_type", "found");
-    body.append("image", image);
+    body.append("image", images[0].file);
+    images.slice(1).forEach((item) => body.append("extra_images", item.file));
+    if (useAnalysis) body.append("analysis_id", analysis.data.analysis_id);
 
-    if (form.category) body.append("category", form.category);
-    if (form.color) body.append("color", form.color);
-    if (form.brand) body.append("brand", form.brand);
+    const formAnswers = buildFormAnswers(useAnalysis);
+    if (Object.keys(formAnswers).length) body.append("form_answers", JSON.stringify(formAnswers));
     if (form.description) body.append("description", form.description);
     if (form.location) body.append("location", form.location);
     if (form.occurredAt) body.append("occurred_at", form.occurredAt);
@@ -272,14 +564,20 @@ function RegisterView({ onGoSearch }) {
         error: false,
       });
       setRegistered(data);
-      setForm({ category: "", color: "", brand: "", description: "", location: "", occurredAt: "" });
-      setImage(null);
-      setPreview(null);
+      setForm({ description: "", location: "", occurredAt: "" });
+      clearImages();
+      resetChecks();
       setFileInputKey((key) => key + 1);
     } catch (error) {
       setState({ loading: false, message: error.message, error: true });
     }
   }
+
+  const categoryField = schema?.category_field;
+  const formFields = fieldsFor(schema, answers.category);
+  const needsCheckCount = Object.entries(aiInfo).filter(
+    ([key, info]) => info?.needs_check && !touched[key]
+  ).length;
 
   return (
     <section className="workspace">
@@ -287,70 +585,105 @@ function RegisterView({ onGoSearch }) {
         <span className="eyebrow">FOUND ITEM</span>
         <h1>습득물 간편 등록</h1>
         <p>
-          사진만 올리고 등록하면 바로 끝납니다. 물품 종류, 색상, 브랜드/로고, 외형적 특징은
-          등록 후 Vision-Language 모델이 서버에서 분석해 자동으로 채우므로 페이지를 나가셔도 됩니다.
+          사진을 올리면 AI가 항목을 미리 골라 둡니다. 노란색 "확인해주세요" 항목만 보고 고쳐 주세요.
+          그대로 등록해도 됩니다.
         </p>
       </div>
 
       <form className="form-layout" onSubmit={submit}>
         <div className="upload-panel">
-          <Field label="습득물 사진">
+          <Field
+            label={`습득물 사진 (${images.length}/${MAX_REGISTER_IMAGES})`}
+            hint="휴대폰은 후면·전면·측면을 함께 올리면 기종을 더 정확히 구분합니다. 첫 번째 사진이 대표 사진입니다."
+          >
             <input
               key={fileInputKey}
               className="file-input"
               type="file"
+              multiple
               accept="image/png,image/jpeg,image/webp"
-              onChange={(event) => handleImage(event.target.files?.[0])}
+              disabled={images.length >= MAX_REGISTER_IMAGES}
+              onChange={(event) => addImages(event.target.files)}
             />
           </Field>
 
           <div className="preview-box">
-            {preview ? <img src={preview} alt="선택한 습득물 미리보기" /> : <span>사진 미리보기</span>}
+            {images.length ? (
+              <img src={images[0].url} alt="대표 사진 미리보기" />
+            ) : (
+              <span>사진 미리보기</span>
+            )}
           </div>
+
+          {images.length ? (
+            <ul className="thumb-list" aria-label="선택한 사진">
+              {images.map((item, index) => (
+                <li key={item.url} className={`thumb ${index === 0 ? "primary" : ""}`}>
+                  <img src={item.url} alt={`선택한 사진 ${index + 1}`} />
+                  {index === 0 ? <span className="thumb-badge">대표</span> : null}
+                  <div className="thumb-actions">
+                    {index !== 0 ? (
+                      <button type="button" onClick={() => makePrimary(index)}>
+                        대표로
+                      </button>
+                    ) : null}
+                    <button type="button" onClick={() => removeImage(index)} aria-label={`사진 ${index + 1} 삭제`}>
+                      삭제
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {analysis.status === "done" && analysis.data.photo_hint ? (
+            <div className="photo-hint">
+              <strong>사진 추가 안내</strong>
+              <span>{analysis.data.photo_hint}</span>
+            </div>
+          ) : null}
 
           <div className="integration-note">
             <strong>AI 자동 정보 추출</strong>
             <span>
-              오른쪽 칸은 비워 두셔도 됩니다. 등록 후 AI가 물품 종류 · 색상 · 브랜드/로고 ·
-              외형적 특징을 분석해 빈 칸을 채웁니다. 직접 입력한 값은 그대로 유지됩니다.
+              {analysis.status === "loading"
+                ? "AI가 사진을 분석하고 있습니다... 기다리지 않고 등록해도 등록 후 자동으로 분석합니다."
+                : analysis.status === "done"
+                  ? needsCheckCount
+                    ? `AI가 항목을 골라 두었습니다. 확인이 필요한 항목 ${needsCheckCount}개를 봐 주세요.`
+                    : "AI가 항목을 골라 두었습니다. 다르면 고쳐 주세요."
+                  : analysis.status === "error"
+                    ? `AI 분석 실패: ${analysis.message} 항목을 직접 고르거나 그대로 등록하면 등록 후 다시 분석합니다.`
+                    : "사진을 올리면 AI가 품목·색상·브랜드 등을 미리 골라 둡니다. 직접 고른 값이 AI 값보다 우선합니다."}
             </span>
           </div>
 
-          {registered ? <RegisteredItemStatus item={registered} /> : null}
+          {registered ? <RegisteredItemStatus item={registered} labels={labels} /> : null}
         </div>
 
         <div className="form-panel">
-          <div className="two-column">
-            <Field label="물품 종류">
-              <input
-                value={form.category}
-                onChange={(event) => updateField("category", event.target.value)}
-                placeholder="예: 무선 이어폰 케이스"
-              />
-            </Field>
-            <Field label="색상">
-              <input
-                value={form.color}
-                onChange={(event) => updateField("color", event.target.value)}
-                placeholder="예: 검은색"
-              />
-            </Field>
-          </div>
+          {schemaError ? <div className="form-message error">{schemaError}</div> : null}
 
-          <Field label="브랜드 / 로고">
-            <input
-              value={form.brand}
-              onChange={(event) => updateField("brand", event.target.value)}
-              placeholder="예: Samsung"
+          {categoryField ? (
+            <CheckFields
+              fields={[categoryField]}
+              values={answers}
+              onChange={changeAnswer}
+              ai={aiInfo}
+              touched={touched}
             />
-          </Field>
+          ) : null}
+
+          {formFields.length ? (
+            <CheckFields fields={formFields} values={answers} onChange={changeAnswer} ai={aiInfo} touched={touched} />
+          ) : null}
 
           <Field label="외형적 특징 / 설명">
             <textarea
-              rows="4"
+              rows="3"
               value={form.description}
               onChange={(event) => updateField("description", event.target.value)}
-              placeholder="예: 오른쪽 모서리에 작은 흠집이 있음"
+              placeholder="비워 두면 AI가 관찰한 특징으로 채웁니다. 예: 오른쪽 모서리에 작은 흠집"
             />
           </Field>
 
@@ -390,25 +723,57 @@ function RegisterView({ onGoSearch }) {
 }
 
 function SearchView() {
+  const [schema, schemaError] = useFormSchema();
   const [form, setForm] = useState({
     description: "",
     location: "",
     occurredAt: "",
     topK: 5,
   });
+  const [answers, setAnswers] = useState({ category: UNKNOWN });
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [results, setResults] = useState([]);
   const [selected, setSelected] = useState(null);
   const [state, setState] = useState({ loading: false, message: "", error: false });
 
+  const labels = useMemo(() => fieldLabelMap(schema), [schema]);
+  const formFields = fieldsFor(schema, answers.category);
+  const filters = useMemo(() => {
+    const result = {};
+    formFields.forEach((field) => {
+      const value = answers[field.key];
+      if (value && value !== UNKNOWN) result[field.key] = value;
+    });
+    return result;
+  }, [answers, formFields]);
+  const hasCategory = answers.category && answers.category !== UNKNOWN;
+
   const hasQuery = useMemo(
-    () => Boolean(form.description.trim() || image || form.location.trim() || form.occurredAt),
-    [form, image]
+    () =>
+      Boolean(
+        form.description.trim() || image || form.location.trim() || form.occurredAt || hasCategory
+      ),
+    [form, image, hasCategory]
   );
 
   function updateField(key, value) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function changeAnswer(key, value) {
+    if (key === "category") {
+      // 품목을 바꾸면 공통 항목(색상 등)만 유지
+      setAnswers((current) => {
+        const next = emptyAnswers(schema, value);
+        Object.keys(next).forEach((k) => {
+          if (k !== "category" && current[k] !== undefined) next[k] = current[k];
+        });
+        return next;
+      });
+      return;
+    }
+    setAnswers((current) => ({ ...current, [key]: value }));
   }
 
   function handleImage(file) {
@@ -422,7 +787,7 @@ function SearchView() {
     if (!hasQuery) {
       setState({
         loading: false,
-        message: "사진, 자연어 설명, 장소 또는 시간 중 하나 이상을 입력해주세요.",
+        message: "품목, 사진, 자연어 설명, 장소 또는 시간 중 하나 이상을 입력해주세요.",
         error: true,
       });
       return;
@@ -433,6 +798,10 @@ function SearchView() {
     if (form.location) body.append("location", form.location);
     if (form.occurredAt) body.append("occurred_at", form.occurredAt);
     if (image) body.append("image", image);
+    if (hasCategory) {
+      body.append("category", answers.category);
+      if (Object.keys(filters).length) body.append("filters", JSON.stringify(filters));
+    }
     body.append("top_k", "5");
 
     setState({ loading: true, message: "", error: false });
@@ -447,12 +816,16 @@ function SearchView() {
       }
 
       setResults(data.results || []);
+      const filtered =
+        data.total_found_items !== undefined && data.total_candidates < data.total_found_items
+          ? ` (체크한 항목으로 ${data.total_found_items}건 중 ${data.total_candidates}건으로 좁힘)`
+          : "";
       setState({
         loading: false,
         message:
           data.results?.length > 0
-            ? `${data.results.length}개의 후보를 찾았습니다.`
-            : "등록된 습득물 후보가 없습니다.",
+            ? `${data.results.length}개의 후보를 찾았습니다.${filtered}`
+            : `조건에 맞는 습득물 후보가 없습니다.${filtered}`,
         error: false,
       });
     } catch (error) {
@@ -467,12 +840,21 @@ function SearchView() {
         <span className="eyebrow">LOST ITEM</span>
         <h1>사진 또는 자연어로 검색</h1>
         <p>
-          이미지·텍스트·장소·시간 정보를 함께 입력할수록 더 많은 검색 신호를 활용할 수 있습니다.
+          확실히 아는 항목만 체크하세요. 체크한 항목이 다른 습득물은 빼고, 나머지는 사진·설명 유사도로
+          순위를 매깁니다. 모르는 항목은 "모르겠음"으로 두면 됩니다.
         </p>
       </div>
 
       <form className="search-panel" onSubmit={submit}>
         <div className="search-main">
+          {schemaError ? <div className="form-message error">{schemaError}</div> : null}
+          {schema ? (
+            <CheckFields fields={[schema.category_field]} values={answers} onChange={changeAnswer} />
+          ) : null}
+          {formFields.length ? (
+            <CheckFields fields={formFields} values={answers} onChange={changeAnswer} />
+          ) : null}
+
           <Field label="자연어 설명">
             <textarea
               rows="3"
@@ -516,7 +898,7 @@ function SearchView() {
 
           <div className="integration-note">
             <strong>검색 결과</strong>
-            <span>중간발표 데모는 매칭 점수가 높은 Top-5 후보를 표시합니다.</span>
+            <span>체크한 항목과 다른 습득물은 제외하고, 매칭 점수가 높은 Top-5 후보를 표시합니다.</span>
           </div>
 
           <button className="primary-button full" type="submit" disabled={state.loading}>
@@ -538,18 +920,18 @@ function SearchView() {
               <span className="eyebrow">TOP-5 RESULTS</span>
               <h2>유사 습득물 후보</h2>
             </div>
-            <span className="demo-badge">DINOv2 + SigLIP2 + metadata</span>
+            <span className="demo-badge">체크 항목 필터 + DINOv2 + SigLIP2 + metadata</span>
           </div>
 
           <div className="candidate-grid">
             {results.map((candidate) => (
-              <CandidateCard key={candidate.id} candidate={candidate} onSelect={setSelected} />
+              <CandidateCard key={candidate.id} candidate={candidate} labels={labels} onSelect={setSelected} />
             ))}
           </div>
         </section>
       ) : null}
 
-      <MatchDashboard candidate={selected} onClose={() => setSelected(null)} />
+      <MatchDashboard candidate={selected} labels={labels} onClose={() => setSelected(null)} />
     </section>
   );
 }
