@@ -50,6 +50,7 @@ from paths import UPLOAD_DIR, image_filename, resolve_image_path, to_stored_path
 from ai_retrieval import RetrievalModelManager, cosine_similarity_01
 from search_graph import run_search_graph
 from ai_query_parser import QueryParser
+import baze_analyzer
 import gemini_analyzer
 from gemini_analyzer import AnalyzerConfigError, AnalyzerError
 
@@ -57,7 +58,7 @@ logger = logging.getLogger("findyu")
 
 # AI 브랜치의 실행 모드 의미를 그대로 따른다.
 # query_parser_mode: "mock" | "llm"
-# registration_analyzer_mode: "mock" | "vlm" | "gemini"
+# registration_analyzer_mode: "mock" | "vlm" | "gemini" | "baze"(기본, 팩트챗 게이트웨이)
 QUERY_PARSER_MODE = os.getenv("FINDYU_QUERY_PARSER_MODE", "llm").lower()
 QUERY_LLM_MODEL_NAME = os.getenv(
     "FINDYU_QUERY_LLM_MODEL",
@@ -65,7 +66,7 @@ QUERY_LLM_MODEL_NAME = os.getenv(
 )
 REGISTRATION_ANALYZER_MODE = os.getenv(
     "FINDYU_REGISTRATION_ANALYZER_MODE",
-    "vlm",
+    "baze",
 ).lower()
 
 app = FastAPI(title="FindYU Backend - Midterm Demo")
@@ -534,6 +535,7 @@ def _batch_ask_vlm(image: Image.Image):
 
 
 _gemini_analyzer = gemini_analyzer.GeminiAnalyzer()
+_baze_analyzer = baze_analyzer.BazeAnalyzer()
 
 # 세 분석 모드가 공통으로 반환하는 키. 모드가 지원하지 않는 항목은 기본값으로 둔다.
 EMPTY_ANALYSIS = {
@@ -566,7 +568,8 @@ def extract_item_info(images: list[Image.Image]):
     registration_analyzer_mode:
     - mock  : 모델을 실행하지 않고 고정 결과 반환
     - vlm   : 로컬 SmolVLM 실행 (첫 번째 사진만 사용, 기종·확신도 미지원)
-    - gemini: Gemini API + 프롬프트 v1.1 (gemini_analyzer.py)
+    - gemini: Gemini API + 프롬프트 v1.2 (gemini_analyzer.py)
+    - baze  : 팩트챗(BAZE) 게이트웨이로 Gemini 호출, 프롬프트·스키마는 gemini와 같음 (baze_analyzer.py)
     """
     if isinstance(images, Image.Image):
         images = [images]
@@ -596,11 +599,14 @@ def extract_item_info(images: list[Image.Image]):
     if REGISTRATION_ANALYZER_MODE == "gemini":
         return _gemini_analyzer.analyze(images)
 
+    if REGISTRATION_ANALYZER_MODE == "baze":
+        return _baze_analyzer.analyze(images)
+
     # AI 브랜치에서는 registration_analyzer_mode="vlm"이 올바른 값이다.
     # 사용자가 실수로 "llm"을 넣은 경우도 데모가 죽지 않도록 VLM alias로 허용한다.
     if REGISTRATION_ANALYZER_MODE not in {"vlm", "llm"}:
         raise ValueError(
-            "registration_analyzer_mode는 mock, vlm, gemini 중 하나여야 합니다."
+            "registration_analyzer_mode는 mock, vlm, gemini, baze 중 하나여야 합니다."
         )
 
     answers = _batch_ask_vlm(images[0])
@@ -925,11 +931,18 @@ def _analysis_worker():
 
 @app.on_event("startup")
 def start_analysis_worker():
-    if REGISTRATION_ANALYZER_MODE == "gemini":
-        status = gemini_analyzer.config_status()
+    remote_status = {
+        "gemini": gemini_analyzer.config_status,
+        "baze": baze_analyzer.config_status,
+    }.get(REGISTRATION_ANALYZER_MODE)
+    if remote_status is not None:
+        status = remote_status()
         if status["ready"]:
             logger.warning(
-                "등록 분석: Gemini %s (프롬프트 %s)", status["model"], status["prompt_version"]
+                "등록 분석: %s %s (프롬프트 %s)",
+                REGISTRATION_ANALYZER_MODE,
+                status["model"],
+                status["prompt_version"],
             )
         else:
             # 서버는 계속 띄우고, 분석 요청만 명확한 에러로 실패시킨다
@@ -967,6 +980,11 @@ def health_check():
         "registration_gemini": (
             gemini_analyzer.config_status()
             if REGISTRATION_ANALYZER_MODE == "gemini"
+            else None
+        ),
+        "registration_baze": (
+            baze_analyzer.config_status()
+            if REGISTRATION_ANALYZER_MODE == "baze"
             else None
         ),
         "search_workflow": "LangGraph",
