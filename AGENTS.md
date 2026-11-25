@@ -11,7 +11,7 @@
 1. 사용자의 첫 메시지에서 **담당 역할**을 확인한다. (예: `역할: 프론트엔드`)
    - 역할이 없으면 작업하기 전에 "어느 역할로 작업할까요? (PM / AI / 백엔드 / 프론트엔드 / 대시보드)"라고 먼저 묻는다.
 2. 아래 **3. 역할별 담당 범위**에서 내 역할이 수정할 수 있는 경로를 확인한다.
-3. `git status`와 `git branch --show-current`로 현재 브랜치를 확인한다. `main`이나 `demo/midterm`이면 작업하지 말고 사용자에게 알린다.
+3. `git status`와 `git branch --show-current`로 현재 브랜치를 확인한다. `main`이면 작업하지 말고 사용자에게 알린다. 작업 브랜치는 최신 `main`에서 만든다.
 4. `docs/API.md`가 있으면 먼저 읽는다. 프론트·대시보드·AI는 이 문서를 기준으로 백엔드와 연결한다.
 
 ---
@@ -100,10 +100,10 @@ cd frontend && npm install && npm run dev   # http://localhost:5173
 ## 5. Git 규칙
 
 - 작업 브랜치: `feature/<역할>-<기능>` (예: `feature/frontend-checkform`, `feature/dashboard-list`)
-- **시작 기준 브랜치: `demo/midterm`.** 작업 시작 전 `git pull origin demo/midterm`
-- **PR 대상: `demo/midterm`.** 병합은 PM이 한다.
+- **시작 기준 브랜치: `main`.** 작업 시작 전 `git checkout main && git pull origin main` 후 작업 브랜치를 만든다
+- **PR 대상: `main`.** 병합은 PM이 한다.
 - **절대 하지 않는 것**
-  - `main`, `demo/midterm`에 직접 push
+  - `main`에 직접 push
   - `git push --force`, `git reset --hard`로 남의 커밋 지우기
   - 남의 브랜치에 커밋
 - 커밋은 기능 단위로 작게. 메시지 형식: `feat:`, `fix:`, `docs:`, `chore:` + 한국어 설명
@@ -148,7 +148,7 @@ cd frontend && npm install && npm run dev   # http://localhost:5173
 
 | 시각 | 할 일 |
 |---|---|
-| 10:00 | 각자 `demo/midterm` 최신화 후 작업 브랜치 생성 |
+| 10:00 | 각자 `main` 최신화 후 작업 브랜치 생성 |
 | 12:00 | 1차 PR(동작하는 최소 기능) → PM 병합 → 전체 흐름 1회 테스트 |
 | **14:00** | **기능 동결.** 이후로는 버그 수정과 시연 준비만 |
 | 14:30 | 시연 리허설(사전 등록 데이터로), 녹화 영상 백업 |
