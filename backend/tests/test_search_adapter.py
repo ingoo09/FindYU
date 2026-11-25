@@ -82,3 +82,8 @@ def test_baze_calls_ai_module_with_plain_dicts(monkeypatch):
     assert [c["id"] for c in seen["candidates"]] == [1, 2]
     assert set(seen["candidates"][0]) == {"id", "category", "description", "form_values",
                                           "location", "occurred_at", "image_jpeg"}
+
+
+def test_default_mode_is_mock_until_ai_adapter_is_merged():
+    # search_analyzer.py가 병합되면 "baze"로 바꾸고 이 테스트도 고친다
+    assert sa.DEFAULT_MODE == "mock"

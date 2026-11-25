@@ -78,3 +78,9 @@ def test_local_mode_needs_nothing(tool, monkeypatch, capsys):
     monkeypatch.setenv("FINDYU_SEARCH_ANALYZER_MODE", "local")
     assert tool.main([]) == 0
     assert "필요 없습니다" in capsys.readouterr().out
+
+
+def test_default_mode_follows_server_default(tool, monkeypatch, capsys):
+    monkeypatch.delenv("FINDYU_SEARCH_ANALYZER_MODE", raising=False)
+    assert tool.main(["--dry-run"]) == 0
+    assert "모드: mock" in capsys.readouterr().out

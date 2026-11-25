@@ -74,10 +74,13 @@ REGISTRATION_ANALYZER_MODE = os.getenv(
     "FINDYU_REGISTRATION_ANALYZER_MODE",
     "baze",
 ).lower()
-# search_analyzer_mode: "baze"(기본, 게이트웨이 임베딩 + Gemini 비교) | "mock"(API 호출 없음) | "local"(기존 DINOv2·SigLIP2)
+# search_analyzer_mode: "baze"(게이트웨이 임베딩 + Gemini 비교) | "mock"(기본, API 호출 없음) | "local"(기존 DINOv2·SigLIP2)
+# 기본값은 AI의 search_analyzer.py가 병합될 때까지 mock (search_adapter.DEFAULT_MODE)
 # baze·mock에서는 로컬 검색 모델을 불러오지 않는다
-SEARCH_ANALYZER_MODE = os.getenv("FINDYU_SEARCH_ANALYZER_MODE", "baze").strip().lower()
-if SEARCH_ANALYZER_MODE not in {"baze", "mock", "local"}:
+SEARCH_ANALYZER_MODE = (
+    os.getenv("FINDYU_SEARCH_ANALYZER_MODE", "").strip().lower() or search_adapter.DEFAULT_MODE
+)
+if SEARCH_ANALYZER_MODE not in search_adapter.MODES:
     raise RuntimeError("FINDYU_SEARCH_ANALYZER_MODE는 baze, mock, local 중 하나여야 합니다.")
 
 app = FastAPI(title="FindYU Backend - Midterm Demo")

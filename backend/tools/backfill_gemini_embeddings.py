@@ -10,7 +10,7 @@
   (수동 등록 중 임베딩 실패, v8 이전 물품 등)
 - 모델은 서버와 같은 설정을 쓴다 (FINDYU_SEARCH_ANALYZER_MODE, FINDYU_EMBEDDING_MODEL, FINDYU_EMBEDDING_DIMENSIONS)
   - baze: 게이트웨이 호출 (사진 --batch장씩 한 번에)
-  - mock: API 호출 없음
+  - mock: API 호출 없음 (기본값. 게이트웨이로 채우려면 FINDYU_SEARCH_ANALYZER_MODE=baze로 실행)
   - local: 필요 없음 (DINOv2는 서버가 처리)
 - 실패한 묶음은 재시도하지 않고 비워 둔다. API 키는 출력하지 않는다.
 """
@@ -33,6 +33,7 @@ import os  # noqa: E402
 
 import gemini_embedding  # noqa: E402
 import models  # noqa: E402
+import search_adapter  # noqa: E402
 from database import DB_PATH, Base, SessionLocal, engine  # noqa: E402
 from migrations import run_migrations  # noqa: E402
 from paths import resolve_image_path  # noqa: E402
@@ -68,7 +69,8 @@ def main(argv=None) -> int:
     if not 1 <= args.batch <= MAX_BATCH:
         parser.error(f"--batch는 1~{MAX_BATCH} 사이여야 합니다.")
 
-    mode = os.getenv("FINDYU_SEARCH_ANALYZER_MODE", "baze").strip().lower()
+    # 서버와 같은 기본값 (search_adapter.DEFAULT_MODE). 게이트웨이로 채우려면 FINDYU_SEARCH_ANALYZER_MODE=baze
+    mode = os.getenv("FINDYU_SEARCH_ANALYZER_MODE", "").strip().lower() or search_adapter.DEFAULT_MODE
     embedder = gemini_embedding.make_embedder(mode)
     if embedder is None:
         print(f"FINDYU_SEARCH_ANALYZER_MODE={mode}: 사진 임베딩 백필이 필요 없습니다 (baze 또는 mock에서 사용).")

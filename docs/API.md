@@ -320,7 +320,7 @@ curl -F item_type=found -F image=@back.jpg -F extra_images=@side.jpg \
 
 ## POST /search — 게이트웨이 검색 (baze · mock)
 
-`FINDYU_SEARCH_ANALYZER_MODE=baze`(기본) 또는 `mock`일 때의 검색. 로컬 검색 모델(DINOv2·SigLIP2·Qwen)을 불러오지 않는다. 요청 필드는 그대로다 (`image` 또는 `description`, 선택 `category`·`filters`·`location`·`occurred_at`·`top_k`).
+`FINDYU_SEARCH_ANALYZER_MODE=baze` 또는 `mock`(**현재 기본값**)일 때의 검색. 기본값은 AI 담당의 `backend/search_analyzer.py`가 병합될 때까지 `mock`이다 (병합되면 `baze`로 바꾼다). 로컬 검색 모델(DINOv2·SigLIP2·Qwen)을 불러오지 않는다. 요청 필드는 그대로다 (`image` 또는 `description`, 선택 `category`·`filters`·`location`·`occurred_at`·`top_k`).
 
 ### 흐름
 
@@ -400,7 +400,7 @@ curl -F item_type=found -F image=@back.jpg -F extra_images=@side.jpg \
 - 응답의 `usage.prompt_tokens`가 **사진 1장당 1,000을 넘으면 오류(502)**로 본다. 사진으로 처리되면 장당 258토큰이고, data URL을 문자열로 보내 글자로 처리되면 18만 토큰이 나온다 (2026-11-25 실험). 게이트웨이가 200을 주면서 엉뚱한 벡터를 돌려주는 경우를 막기 위한 검사다.
 - 등록 후 백그라운드에서 1회 시도하고, 실패하면 비워 둔다. 기존 `embedding`(DINOv2) 칸과 따로 `image_embedding_gemini`·`image_embedding_model`(DB v8)에 저장해 섞지 않는다. 다른 모델로 만든 임베딩은 검색에서 "없음"으로 본다.
 - 비어 있는 물품은 수동 백필로 채운다 (서버 시작 때 자동 실행 안 함):
-  `.venv/bin/python tools/backfill_gemini_embeddings.py` → 대상 수와 게이트웨이 호출 수를 보여주고 확인받은 뒤 실행 (`--dry-run`, `--batch`)
+  `FINDYU_SEARCH_ANALYZER_MODE=baze .venv/bin/python tools/backfill_gemini_embeddings.py` → 대상 수와 게이트웨이 호출 수를 보여주고 확인받은 뒤 실행 (`--dry-run`, `--batch`). 모드를 주지 않으면 서버와 같은 기본값(mock)으로 API 없이 채운다
 
 ---
 
@@ -508,12 +508,13 @@ curl -F item_type=found -F image=@back.jpg -F extra_images=@side.jpg \
 | 환경변수 | 값 | 기본 |
 |---|---|---|
 | `FINDYU_REGISTRATION_ANALYZER_MODE` | `baze` / `gemini` / `mock` / `vlm` | `baze` |
-| `FINDYU_SEARCH_ANALYZER_MODE` | `baze`(게이트웨이 임베딩 + 검색 어댑터) / `mock`(API 호출 없음, 테스트·개발) / `local`(기존 DINOv2·SigLIP2) | `baze` |
+| `FINDYU_SEARCH_ANALYZER_MODE` | `baze`(게이트웨이 임베딩 + 검색 어댑터) / `mock`(API 호출 없음, 테스트·개발) / `local`(기존 DINOv2·SigLIP2) | **`mock`** (`search_analyzer.py` 병합 전까지) |
 | `BAZE_API_KEY`, `FINDYU_BAZE_BASE_URL`, `FINDYU_BAZE_MODEL` | 등록 분석과 검색 비교가 함께 쓴다 | |
 | `FINDYU_EMBEDDING_MODEL` | 사진 임베딩 모델 | `gemini-embedding-2` |
 | `FINDYU_EMBEDDING_DIMENSIONS` | 임베딩 차원 | `256` |
 | `FINDYU_EMBEDDING_TIMEOUT` | 임베딩 요청 제한 시간(초) | `60` |
 | `FINDYU_DB_PATH`, `FINDYU_UPLOAD_DIR` | DB 파일·업로드 폴더 위치 (테스트용) | `backend/findyu.db`, `backend/uploads` |
 
-- `baze` 검색은 AI 담당의 `backend/search_analyzer.py`가 있어야 동작한다. 그 전에는 503이므로 `mock`으로 실행한다.
+- `baze` 검색은 AI 담당의 `backend/search_analyzer.py`가 있어야 동작한다 (없으면 503). 그래서 병합 전까지 기본값은 `mock`이고, 병합되면 백�d가 기본값을 `baze`로 바꾼다 (`search_adapter.DEFAULT_MODE`).
+- `mock` 검색은 사진 임베딩도 API 없이 만들기 때문에, mock으로 저장된 임베딩은 `baze`로 바꾼 뒤 "없음"으로 취급된다 (모델이 다름). 필요하면 백필 도구로 다시 채운다.
 - 테스트(`pytest`)는 `tests/conftest.py`가 임시 DB·업로드 폴더와 `mock` 모드를 정한다. 실제 DB와 API를 쓰지 않는다.

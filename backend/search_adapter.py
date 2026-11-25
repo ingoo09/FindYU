@@ -19,7 +19,7 @@ AI 담당이 구현할 함수 (docs/REQUESTS.md 2026-11-25 요청 참고)
     - 실패는 gemini_analyzer.AnalyzerError(호출·응답 오류, API 502) /
       AnalyzerConfigError(키·설정 없음, API 503)로 올린다
 
-FINDYU_SEARCH_ANALYZER_MODE
+FINDYU_SEARCH_ANALYZER_MODE (기본 mock, 아래 DEFAULT_MODE)
 - mock : API 호출 없음. 받은 후보 순서를 그대로 순위로, match_reasons는 빈 배열
 - baze : search_analyzer.compare 호출 (모듈이 아직 없으면 503)
 - local: 이 어댑터를 쓰지 않는 기존 DINOv2·SigLIP2 검색 (main.py)
@@ -33,6 +33,11 @@ from PIL import Image
 
 import gemini_analyzer
 from gemini_analyzer import AnalyzerConfigError, AnalyzerError
+
+# FINDYU_SEARCH_ANALYZER_MODE 기본값. AI 담당의 search_analyzer.py가 병합될 때까지 mock으로 둔다
+# (기존 .env를 쓰는 팀원이 main 병합 후 검색 503을 겪지 않게). 병합되면 "baze"로 바꾼다
+DEFAULT_MODE = "mock"
+MODES = ("baze", "mock", "local")
 
 MAX_CANDIDATES = 10
 MAX_REASONS = 3
