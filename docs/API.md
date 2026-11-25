@@ -1,6 +1,6 @@
 # FindYU 백엔드 API
 
-- [물품 목록](#get-items--물품-목록) · [장소 선택지](#get-itemslocations--장소-필터-선택지)
+- [검색 점수](#검색-점수-similarity_score-2026-11-25-변경) · [물품 목록](#get-items--물품-목록) · [장소 선택지](#get-itemslocations--장소-필터-선택지)
 - 체크 폼: [form-schema](#get-form-schema) · [등록 분석](#post-itemsanalyze) · [등록](#post-items-추가된-필드) · [검색](#post-search-추가된-필드)
 
 ## 체크 폼
@@ -233,7 +233,23 @@ curl -F item_type=found \
 - 체크한 항목(**`"모르겠음"` 제외**)과 값이 **다른** 습득물은 후보에서 뺀다.
 - 습득물 쪽 값이 비어 있으면(AI도 사람도 모름) **빼지 않고** `filter_check`에 `"미확인"`으로 표시한다. AI가 판단하지 못한 습득물이 검색에서 사라지지 않게 하기 위해서다.
 - 기종(`device_model`) 필터: 띄어쓰기·대소문자를 무시하고 습득물의 기종 또는 대안후보와 같으면 일치. 습득물 기종이 "… 시리즈"(제품군)면 "미확인"으로 남긴다.
-- 남은 후보는 기존 점수(DINOv2 이미지 0.45 / SigLIP2 텍스트 0.25 / 장소 0.20 / 시간 0.10)로 순위를 매긴다.
+- 남은 후보는 `similarity_score`로 순위를 매긴다 (아래 "검색 점수" 참고).
+
+### 검색 점수 `similarity_score` (2026-11-25 변경)
+
+| 필드 | 의미 |
+|---|---|
+| `similarity_score` | 최종 점수 0~1. 아래 항목 중 **값이 있는 것만** 가중 평균: 이미지 0.45 / 텍스트 0.25 / 장소 0.20 / 시간 0.10. 결과는 이 값의 내림차순 |
+| `image_similarity` | 검색 사진과 습득물 대표 사진의 DINOv2 코사인 유사도 (음수는 0). 사진 없이 검색하면 `null` |
+| `text_similarity` | 검색어와 습득물 사진의 SigLIP2 코사인 유사도 (음수는 0). 검색어가 없으면 `null` |
+| `location_score`, `time_score` | 장소·시간 점수 0~1. 입력이 없으면 `null` |
+| `matching_score`, `similarity` | **이전 이름. `similarity_score`와 같은 값이며, 프론트 전환 후 제거 예정** |
+
+- **확률이 아니다.** 화면에 "%"·"확률"·"일치율"로 보여주지 않고, 순위나 "높음/보통/낮음" 정도로만 보여준다 (AGENTS.md 7-2). 높음/보통/낮음 구간은 아직 측정하지 않았다.
+- 예전에는 코사인 값을 `(cos + 1) / 2`로 바꿔서 관련 없는 물품도 0.5~0.7이 나왔다. 지금은 코사인 값을 그대로 쓴다. 같은 사진은 1.0, 관련 없는 물품은 대체로 0~0.35 (2026-11-25 로컬 데이터 7건 기준).
+- SigLIP2 텍스트 유사도는 값 자체가 작다 (같은 측정에서 0.03~0.15). 순위 비교에만 쓴다.
+- 이 변경으로 이미지·텍스트 점수는 예전 값의 절반 폭이 되어, 장소·시간을 함께 입력하면 장소·시간의 영향이 예전보다 커진다. 이미지와 텍스트 사이의 비중·순위는 그대로다.
+- `POST /compare`도 `similarity_score`(코사인)를 준다. `is_same_item`은 예전과 같은 기준(예전 점수 0.8 = 코사인 0.6 이상)이다.
 
 응답에 추가된 필드
 
@@ -259,7 +275,9 @@ curl -F image=@15pro_side2.jpeg -F category=스마트폰 \
   "total_candidates": 2,
   "results": [
     {"id": 12, "category": "스마트폰", "device_model": "iPhone 15 Pro", "color": "검정",
-     "matching_score": 0.6953, "image_similarity": 0.6953,
+     "similarity_score": 0.3906, "image_similarity": 0.3906, "text_similarity": null,
+     "location_score": null, "time_score": null,
+     "matching_score": 0.3906, "similarity": 0.3906,
      "filter_check": {"category": "일치", "color": "일치", "has_card_wallet": "일치"}}
   ]
 }

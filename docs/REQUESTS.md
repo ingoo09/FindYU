@@ -1,1 +1,3 @@
 - [백엔드→PM] CLAUDE.md 3절 '목록 API 필터·페이지' 완료 표시 / `feature/backend-list-api`에서 구현 (docs/API.md 참고) / 보통
+- [백엔드→프론트엔드] 검색 결과 점수를 `matching_score` 대신 `similarity_score`로 읽고, "%" 표시(scoreLabel)를 순위 또는 높음/보통/낮음으로 바꿔 주세요 / AGENTS.md 7-2, 점수는 확률이 아님. `matching_score`는 전환 후 백엔드에서 제거 (docs/API.md "검색 점수") / 급함
+- [백엔드→PM] CLAUDE.md 3절 '검색 점수를 similarity_score로 변경' 완료 표시 / `feature/backend-similarity-score`에서 구현 / 보통
