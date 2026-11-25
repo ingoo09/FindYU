@@ -1,0 +1,2927 @@
+{
+ "model": "gemini-3.5-flash",
+ "repeat": 3,
+ "stopped": null,
+ "results": [
+  {
+   "run": 1,
+   "truth": "iPhone 15 Pro",
+   "combo": "후면만",
+   "photos": [
+    "15pro_back.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 8.8
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "검정",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone Pro 시리즈",
+    "device_model_candidates": [
+     "iPhone 14 Pro",
+     "iPhone 15 Pro"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": true,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "전면 화면 사진 없음 (Dynamic Island 형태 확인 불가)",
+     "측면 사진 없음 (무음 스위치/액션 버튼 확인 불가)"
+    ],
+    "features": "후면 트리플 카메라 · 투명 범퍼 케이스 · 부착형 검은색 카드지갑 · 카드지갑 겉면 잔흠집",
+    "evidence": [
+     "사진 1: 대형 3구 카메라 및 LiDAR 센서 구성을 통해 iPhone Pro 시리즈로 확인",
+     "사진 1: 하단에 부착된 검은색 가죽 카드지갑 관찰"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "보통"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.6
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "후면 트리플 카메라 · 투명 범퍼 케이스 · 부착형 검은색 카드지갑 · 카드지갑 겉면 잔흠집",
+    "analysis_id": "358476a8ef3b47b1b6c25b42324fa8d9",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone Pro 시리즈",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone Pro 시리즈",
+        "iPhone 14 Pro",
+        "iPhone 15 Pro"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "검정",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  },
+  {
+   "run": 1,
+   "truth": "iPhone 15 Pro",
+   "combo": "후면+전면",
+   "photos": [
+    "15pro_back.jpeg",
+    "15pro_front.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 7.1
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "검정",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone Pro 시리즈",
+    "device_model_candidates": [
+     "iPhone 14 Pro",
+     "iPhone 15 Pro"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": true,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "측면 사진 없음 (액션 버튼 및 음량 스위치 형태 확인 불가)",
+     "후면 카드지갑으로 인해 본체 후면 색상 확인 불가"
+    ],
+    "features": "트리플 카메라 구성 · 후면 검은색 카드지갑 부착 · 투명 범퍼 케이스 착용 · 전면 보호필름 부착",
+    "evidence": [
+     "사진 1: 3개의 카메라 렌즈와 LiDAR 센서가 위치한 카메라 섬 확인",
+     "사진 1: 스마트폰 후면에 검은색 카드지갑 부착 확인",
+     "사진 2: 동일한 케이스를 씌운 전면 디스플레이 형태 확인"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "보통"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.6
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "트리플 카메라 구성 · 후면 검은색 카드지갑 부착 · 투명 범퍼 케이스 착용 · 전면 보호필름 부착",
+    "analysis_id": "59c9a8234feb40a48efb92e100bb1fff",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone Pro 시리즈",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone Pro 시리즈",
+        "iPhone 14 Pro",
+        "iPhone 15 Pro"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "검정",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  },
+  {
+   "run": 1,
+   "truth": "iPhone 15 Pro",
+   "combo": "후면+측면(side2)",
+   "photos": [
+    "15pro_back.jpeg",
+    "15pro_side2.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 8.1
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "검정",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone Pro 시리즈",
+    "device_model_candidates": [
+     "iPhone 14 Pro",
+     "iPhone 13 Pro"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": true,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "전면 사진 없음 (노치 또는 Dynamic Island 구분 불가)",
+     "케이스 미착용 상태의 측면 버튼 및 재질 확인 불가"
+    ],
+    "features": "트리플 카메라 · 후면 카드지갑 부착 · 투명 케이스 착용 · LiDAR 센서",
+    "evidence": [
+     "사진 1: 트리플 카메라 및 후면에 부착된 검은색 카드지갑 관찰됨",
+     "사진 2: 제품 좌측 버튼 구조 및 케이스 형태 관찰됨"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "높음"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.9
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "트리플 카메라 · 후면 카드지갑 부착 · 투명 케이스 착용 · LiDAR 센서",
+    "analysis_id": "6cc3ba7782054a8bb6b33cc7ca446d44",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone Pro 시리즈",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone Pro 시리즈",
+        "iPhone 14 Pro",
+        "iPhone 13 Pro"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "검정",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  },
+  {
+   "run": 1,
+   "truth": "iPhone 15 Pro",
+   "combo": "5장 전체",
+   "photos": [
+    "15pro_back.jpeg",
+    "15pro_back_hand.jpeg",
+    "15pro_front.jpeg",
+    "15pro_side1.jpeg",
+    "15pro_side2.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 14.7
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "검정",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone 15 Pro",
+    "device_model_candidates": [
+     "iPhone 16 Pro",
+     "iPhone 14 Pro"
+    ],
+    "identification_level": "확인",
+    "has_case": true,
+    "has_card_wallet": true,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "우측 측면 하단 사진 없음 (카메라 컨트롤 버튼 존재 여부 확인 불가)",
+     "케이스 탈거 후 본체 고유 색상 확인 필요"
+    ],
+    "features": "투명 및 범퍼 테두리 케이스 착용 · 뒷면에 검은색 부착형 카드지갑 부착 · 후면 트리플 카메라 및 렌즈 커버 부착 · 전면 강화유리 보호필름 부착",
+    "evidence": [
+     "사진 1: 후면 트리플 카메라 배치 및 검은색 카드지갑 확인",
+     "사진 3: 전면 디스플레이 형태 확인",
+     "사진 4: 케이스를 씌운 측면 및 후면 카드지갑 두께 확인",
+     "사진 5: 음량 조절 버튼 상단의 액션 버튼 구조 확인"
+    ],
+    "generation_evidence": [
+     {
+      "feature": "측면 무음 스위치 대신 액션 버튼 적용",
+      "photo": 5
+     }
+    ],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "높음"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.9
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "투명 및 범퍼 테두리 케이스 착용 · 뒷면에 검은색 부착형 카드지갑 부착 · 후면 트리플 카메라 및 렌즈 커버 부착 · 전면 강화유리 보호필름 부착",
+    "analysis_id": "f4e2cc009a5e488bb970d41fdd65c417",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone 15 Pro",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음"
+       ],
+       "suggestions": [
+        "iPhone 15 Pro",
+        "iPhone 16 Pro",
+        "iPhone 14 Pro"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "검정",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": null
+    },
+    "photo_hint": null
+   }
+  },
+  {
+   "run": 1,
+   "truth": "iPhone 12",
+   "combo": "후면만",
+   "photos": [
+    "iphone12_back.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 10.2
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "흰색",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone 11",
+    "device_model_candidates": [
+     "iPhone 12",
+     "iPhone 12 mini"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": false,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "케이스로 인해 측면 프레임 곡률 확인 불가",
+     "전면 화면 사진 없음"
+    ],
+    "features": "고양이 캐릭터 일러스트 케이스 · 'How can cute cats make mistakes?' 영문 문구 · 수직 배열 듀얼 카메라 · 입체적 물결 형태 케이스",
+    "evidence": [
+     "사진 1: 사각형 카메라 모듈 내 수직으로 배열된 듀얼 카메라",
+     "사진 1: 고양이 그림과 문구가 들어간 불투명 케이스 착용"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "높음"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.9
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "고양이 캐릭터 일러스트 케이스 · 'How can cute cats make mistakes?' 영문 문구 · 수직 배열 듀얼 카메라 · 입체적 물결 형태 케이스",
+    "analysis_id": "2519682e569543f98b59d73661b5711a",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone 11",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone 11",
+        "iPhone 12",
+        "iPhone 12 mini"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "흰색",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "없음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  },
+  {
+   "run": 1,
+   "truth": "iPhone 12",
+   "combo": "후면+전면",
+   "photos": [
+    "iphone12_back.jpeg",
+    "iphone12_front.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 6.4
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "흰색",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone 12",
+    "device_model_candidates": [
+     "iPhone 11"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": false,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "측면 사진 없음 (평평한 프레임 여부 확인 불가)",
+     "케이스로 인해 본체 세부 디자인 가려짐"
+    ],
+    "features": "고양이 일러스트 케이스 · How can cute cats make mistakes? 영문 문구 · 수직 배열 듀얼 카메라 · 전면 노치 디스플레이",
+    "evidence": [
+     "사진 1: 고양이 일러스트와 영문 문구가 적힌 케이스 착용",
+     "사진 1: 수직 구조의 듀얼 카메라 모듈 확인",
+     "사진 2: 전면 노치 디스플레이 확인"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "높음"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.9
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "고양이 일러스트 케이스 · How can cute cats make mistakes? 영문 문구 · 수직 배열 듀얼 카메라 · 전면 노치 디스플레이",
+    "analysis_id": "d4137a59299d4db5bc712d57f973e10d",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone 12",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone 12",
+        "iPhone 11"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "흰색",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "없음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  },
+  {
+   "run": 2,
+   "truth": "iPhone 15 Pro",
+   "combo": "후면만",
+   "photos": [
+    "15pro_back.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 7.6
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "검정",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone Pro 시리즈",
+    "device_model_candidates": [
+     "iPhone 14 Pro",
+     "iPhone 15 Pro"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": true,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "측면 사진 없음 (액션 버튼 여부 확인 불가)",
+     "전면 사진 없음 (디스플레이 형태 확인 불가)"
+    ],
+    "features": "투명 케이스 착용 · 뒷면 검은색 카드지갑 부착 · 트리플 카메라 구성 · 케이스 테두리 갈색 변색",
+    "evidence": [
+     "사진 1: 뒷면에 3개의 카메라 렌즈와 LiDAR 센서가 확인됨",
+     "사진 1: 투명 케이스가 씌워져 있음",
+     "사진 1: 후면에 검은색 카드지갑이 부착되어 있음"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "높음"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.9
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "투명 케이스 착용 · 뒷면 검은색 카드지갑 부착 · 트리플 카메라 구성 · 케이스 테두리 갈색 변색",
+    "analysis_id": "351dde32622e487383b0b7265a7fcfac",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone Pro 시리즈",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone Pro 시리즈",
+        "iPhone 14 Pro",
+        "iPhone 15 Pro"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "검정",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  },
+  {
+   "run": 2,
+   "truth": "iPhone 15 Pro",
+   "combo": "후면+전면",
+   "photos": [
+    "15pro_back.jpeg",
+    "15pro_front.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 8.8
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "검정",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone Pro 시리즈",
+    "device_model_candidates": [
+     "iPhone 14 Pro",
+     "iPhone 15 Pro"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": true,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "측면 사진 없음 (액션 버튼 여부 확인 불가)",
+     "카드지갑으로 가려진 본체 뒷면 상세 확인 필요"
+    ],
+    "features": "트리플 카메라 · 투명 케이스 착용 · 뒷면 검은색 카드지갑 부착 · 평평한 측면 프레임",
+    "evidence": [
+     "사진 1: 뒷면에 3구 카메라 섬 및 LiDAR 센서 확인됨",
+     "사진 1: 뒷면에 검은색 카드지갑이 부착되어 있음",
+     "사진 1: 갈색 테두리 투명 케이스 착용",
+     "사진 2: 전면 디스플레이 및 케이스 테두리 확인됨"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "높음"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.9
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "트리플 카메라 · 투명 케이스 착용 · 뒷면 검은색 카드지갑 부착 · 평평한 측면 프레임",
+    "analysis_id": "6e600f84efae45488e77deb14246f446",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone Pro 시리즈",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone Pro 시리즈",
+        "iPhone 14 Pro",
+        "iPhone 15 Pro"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "검정",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  },
+  {
+   "run": 2,
+   "truth": "iPhone 15 Pro",
+   "combo": "후면+측면(side2)",
+   "photos": [
+    "15pro_back.jpeg",
+    "15pro_side2.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 8.9
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "검정",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone Pro 시리즈",
+    "device_model_candidates": [
+     "iPhone 14 Pro",
+     "iPhone 15 Pro"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": true,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "전면 화면 사진 없음",
+     "케이스 제거 후 측면 프레임 및 액션 버튼 여부 확인 필요"
+    ],
+    "features": "후면 트리플 카메라 · 투명 범퍼 케이스 착용 · 후면 검은색 카드지갑 부착 · 카드지갑 표면 미세 스크래치",
+    "evidence": [
+     "사진 1: 후면 대형 트리플 카메라 및 검은색 카드지갑 확인",
+     "사진 2: 동일 물품의 측면 버튼 구조 및 부착된 카드지갑 두께 확인"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "보통"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.6
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "후면 트리플 카메라 · 투명 범퍼 케이스 착용 · 후면 검은색 카드지갑 부착 · 카드지갑 표면 미세 스크래치",
+    "analysis_id": "5142302f04ac4c8caca48c511098a3f5",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone Pro 시리즈",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone Pro 시리즈",
+        "iPhone 14 Pro",
+        "iPhone 15 Pro"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "검정",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  },
+  {
+   "run": 2,
+   "truth": "iPhone 15 Pro",
+   "combo": "5장 전체",
+   "photos": [
+    "15pro_back.jpeg",
+    "15pro_back_hand.jpeg",
+    "15pro_front.jpeg",
+    "15pro_side1.jpeg",
+    "15pro_side2.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 12.8
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "검정",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone Pro 시리즈",
+    "device_model_candidates": [
+     "iPhone 15 Pro",
+     "iPhone 14 Pro"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": true,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "케이스 착용으로 인해 측면 액션 버튼/무음 스위치 여부 명확한 확인 필요",
+     "케이스 탈착 후 본체 고유 색상 및 세부 기종 확인 필요"
+    ],
+    "features": "후면 트리플 카메라 및 LiDAR 스캐너 · 후면 검은색 카드지갑 부착 · 테두리가 갈색인 반투명 케이스 착용 · 전면 디스플레이 보호필름 부착",
+    "evidence": [
+     "사진 1: 3개의 카메라 렌즈와 LiDAR 스캐너, 검은색 카드지갑 확인",
+     "사진 3: 전면 화면 및 케이스 테두리 라인 확인",
+     "사진 5: 측면 버튼부 구조 및 케이스 두께 확인"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "보통"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.6
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "후면 트리플 카메라 및 LiDAR 스캐너 · 후면 검은색 카드지갑 부착 · 테두리가 갈색인 반투명 케이스 착용 · 전면 디스플레이 보호필름 부착",
+    "analysis_id": "442fd2b2cdc446e79c197ce0b5ad958b",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone Pro 시리즈",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone Pro 시리즈",
+        "iPhone 15 Pro",
+        "iPhone 14 Pro"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "검정",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  },
+  {
+   "run": 2,
+   "truth": "iPhone 12",
+   "combo": "후면만",
+   "photos": [
+    "iphone12_back.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 6.6
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "파랑",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone 11",
+    "device_model_candidates": [
+     "iPhone 12",
+     "iPhone 12 mini"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": false,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "측면 프레임 형태 확인 불가 (케이스로 인해 아이폰 11과 12 구분 필요)",
+     "전면 사진 없음"
+    ],
+    "features": "고양이 일러스트 패턴 · How can cute cats make mistakes? 문구 · 물결 모양 입체 케이스 · 세로 듀얼 카메라",
+    "evidence": [
+     "사진 1: 카메라 모듈에 세로 배열의 듀얼 카메라가 확인됨",
+     "사진 1: 고양이 그림과 영문 텍스트가 인쇄된 입체 케이스 착용"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "높음"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.9
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "고양이 일러스트 패턴 · How can cute cats make mistakes? 문구 · 물결 모양 입체 케이스 · 세로 듀얼 카메라",
+    "analysis_id": "553f457e7d0d49ccabb6042c7e91bb83",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone 11",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone 11",
+        "iPhone 12",
+        "iPhone 12 mini"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "파랑",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "없음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  },
+  {
+   "run": 2,
+   "truth": "iPhone 12",
+   "combo": "후면+전면",
+   "photos": [
+    "iphone12_back.jpeg",
+    "iphone12_front.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 12.3
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "흰색",
+    "manufacturer": "애플",
+    "brand": "아이폰",
+    "device_model": "iPhone 12",
+    "device_model_candidates": [
+     "iPhone 11"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": false,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "케이스에 가려진 측면 프레임 형태 확인 필요"
+    ],
+    "features": "고양이 일러스트 및 글귀 프린팅 케이스 · 입체적인 물결 모양 케이스 · 후면 수직 듀얼 카메라 · 전면 노치 디스플레이",
+    "evidence": [
+     "사진 1: 후면 듀얼 카메라 렌즈 수직 배치 및 고양이 캐릭터 패턴 케이스",
+     "사진 2: 전면 상단 노치 디스플레이"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "높음"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.9
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "고양이 일러스트 및 글귀 프린팅 케이스 · 입체적인 물결 모양 케이스 · 후면 수직 듀얼 카메라 · 전면 노치 디스플레이",
+    "analysis_id": "50c5fdfdfbbf4e5d9a94aea0afeebb7e",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone 12",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone 12",
+        "iPhone 11"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "흰색",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "없음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  },
+  {
+   "run": 3,
+   "truth": "iPhone 15 Pro",
+   "combo": "후면만",
+   "photos": [
+    "15pro_back.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 5.3
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "검정",
+    "manufacturer": "애플",
+    "brand": "아이폰",
+    "device_model": "iPhone Pro 시리즈",
+    "device_model_candidates": [
+     "iPhone 14 Pro",
+     "iPhone 15 Pro"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": true,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "측면 사진 없음 (액션 버튼 여부 확인 불가)",
+     "전면 사진 없음 (디스플레이 형태 확인 불가)"
+    ],
+    "features": "투명 케이스 · 검은색 카드지갑 부착 · 후면 트리플 카메라 · LiDAR 센서",
+    "evidence": [
+     "사진 1: 후면 상단 트리플 카메라 및 LiDAR 센서 배치",
+     "사진 1: 테두리가 변색된 투명 케이스 착용",
+     "사진 1: 후면 하단에 검은색 카드지갑 부착"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "보통"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.6
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "투명 케이스 · 검은색 카드지갑 부착 · 후면 트리플 카메라 · LiDAR 센서",
+    "analysis_id": "a3d093682a5e46a3b1e31f1c7f2d0578",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone Pro 시리즈",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone Pro 시리즈",
+        "iPhone 14 Pro",
+        "iPhone 15 Pro"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "검정",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  },
+  {
+   "run": 3,
+   "truth": "iPhone 15 Pro",
+   "combo": "후면+전면",
+   "photos": [
+    "15pro_back.jpeg",
+    "15pro_front.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 8.0
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "검정",
+    "manufacturer": "애플",
+    "brand": "아이폰",
+    "device_model": "iPhone Pro 시리즈",
+    "device_model_candidates": [
+     "iPhone 14 Pro",
+     "iPhone 15 Pro"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": true,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "측면 버튼 형태 미확인 (무음 스위치/액션 버튼 여부)",
+     "하단 충전 단자(Lightning/USB-C) 미확인"
+    ],
+    "features": "후면 부착형 검정색 카드지갑 · 갈색 테두리 투명 케이스 · 후면 트리플 카메라 및 LiDAR 센서 · 전면 디스플레이",
+    "evidence": [
+     "사진 1: 트리플 카메라 레이아웃 및 후면 부착된 검정색 카드지갑 확인",
+     "사진 2: 전면 디스플레이 및 범퍼 케이스 테두리 확인"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "높음"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.9
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "후면 부착형 검정색 카드지갑 · 갈색 테두리 투명 케이스 · 후면 트리플 카메라 및 LiDAR 센서 · 전면 디스플레이",
+    "analysis_id": "332d0ff7f8d5464e8ef63acc1b63b416",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone Pro 시리즈",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone Pro 시리즈",
+        "iPhone 14 Pro",
+        "iPhone 15 Pro"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "검정",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  },
+  {
+   "run": 3,
+   "truth": "iPhone 15 Pro",
+   "combo": "후면+측면(side2)",
+   "photos": [
+    "15pro_back.jpeg",
+    "15pro_side2.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 8.5
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "검정",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone 14 Pro",
+    "device_model_candidates": [
+     "iPhone 13 Pro",
+     "iPhone 15 Pro"
+    ],
+    "identification_level": "확인",
+    "has_case": true,
+    "has_card_wallet": true,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "전면 디스플레이 사진 없음 (노치 vs Dynamic Island 확인 불가)",
+     "케이스 미착용 본체 정확한 모델명 및 색상 확인 필요"
+    ],
+    "features": "투명 범퍼 케이스 착용 · 후면 검정색 맥세이프 카드지갑 부착 · 후면 트리플 카메라 모듈",
+    "evidence": [
+     "사진 1: 후면 3개의 카메라 모듈과 맥세이프 카드지갑 확인",
+     "사진 2: 측면 버튼 구조 및 맥세이프 카드지갑 부착 형태 확인"
+    ],
+    "generation_evidence": [
+     {
+      "feature": "측면 무음 스위치 위치에 케이스 컷아웃 형태",
+      "photo": 2
+     }
+    ],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "높음"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.9
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "투명 범퍼 케이스 착용 · 후면 검정색 맥세이프 카드지갑 부착 · 후면 트리플 카메라 모듈",
+    "analysis_id": "81dffea2cb244f739f73aa142d7a47f4",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone 14 Pro",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음"
+       ],
+       "suggestions": [
+        "iPhone 14 Pro",
+        "iPhone 13 Pro",
+        "iPhone 15 Pro"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "검정",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": null
+    },
+    "photo_hint": null
+   }
+  },
+  {
+   "run": 3,
+   "truth": "iPhone 15 Pro",
+   "combo": "5장 전체",
+   "photos": [
+    "15pro_back.jpeg",
+    "15pro_back_hand.jpeg",
+    "15pro_front.jpeg",
+    "15pro_side1.jpeg",
+    "15pro_side2.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 12.9
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "검정",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone Pro 시리즈",
+    "device_model_candidates": [
+     "iPhone 14 Pro",
+     "iPhone 15 Pro"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": true,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "케이스 제거 후 정확한 기종 및 본체 색상 확인",
+     "전면 화면을 켜서 디스플레이 노치/Dynamic Island 형태 확인"
+    ],
+    "features": "트리플 카메라 · 뒷면 검은색 맥세이프 카드지갑 부착 · 갈색 범퍼 케이스 착용 · 전면 보호필름 부착",
+    "evidence": [
+     "사진 1, 2: 트리플 카메라 모듈과 LiDAR 센서가 장착된 애플 아이폰 후면 확인",
+     "사진 1, 4: 후면에 검은색 가죽 맥세이프 카드지갑 부착 확인",
+     "사진 3: 전면 디스플레이 확인",
+     "사진 4, 5: 갈색 톤의 범퍼 케이스 착용 상태 확인"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "높음"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.9
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "트리플 카메라 · 뒷면 검은색 맥세이프 카드지갑 부착 · 갈색 범퍼 케이스 착용 · 전면 보호필름 부착",
+    "analysis_id": "82c2b016548b479890485d67a4cd2c88",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone Pro 시리즈",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone Pro 시리즈",
+        "iPhone 14 Pro",
+        "iPhone 15 Pro"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "검정",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "전면 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "전면 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  },
+  {
+   "run": 3,
+   "truth": "iPhone 12",
+   "combo": "후면만",
+   "photos": [
+    "iphone12_back.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 10.6
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "파랑",
+    "manufacturer": "애플",
+    "brand": "애플",
+    "device_model": "iPhone 11",
+    "device_model_candidates": [
+     "iPhone 12"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": false,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "전면 화면 사진 없음",
+     "케이스로 인해 측면 프레임 및 액션 버튼/무음 스위치 구분 불가"
+    ],
+    "features": "고양이 드로잉 및 발자국 패턴 · How can cute cats make mistakes? 문구 · 물결 모양 입체 케이스 착용 · 수직 배열 듀얼 카메라",
+    "evidence": [
+     "사진 1: 좌측 상단 수직 배열 듀얼 카메라 모듈 관찰",
+     "사진 1: 고양이 일러스트와 영문 문구가 인쇄된 파스텔 톤 케이스 착용"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "높음"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.9
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "고양이 드로잉 및 발자국 패턴 · How can cute cats make mistakes? 문구 · 물결 모양 입체 케이스 착용 · 수직 배열 듀얼 카메라",
+    "analysis_id": "834d19585a944383a6c112f7a4d24751",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone 11",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone 11",
+        "iPhone 12"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "파랑",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "없음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  },
+  {
+   "run": 3,
+   "truth": "iPhone 12",
+   "combo": "후면+전면",
+   "photos": [
+    "iphone12_back.jpeg",
+    "iphone12_front.jpeg"
+   ],
+   "resized_retry": false,
+   "attempts": [
+    {
+     "resized": false,
+     "status": 200,
+     "elapsed": 10.2
+    }
+   ],
+   "status": 200,
+   "body": {
+    "category": "스마트폰",
+    "color": "흰색",
+    "manufacturer": "애플",
+    "brand": "아이폰",
+    "device_model": "iPhone 12",
+    "device_model_candidates": [
+     "iPhone 11"
+    ],
+    "identification_level": "추정",
+    "has_case": true,
+    "has_card_wallet": false,
+    "earphone_components": null,
+    "wallet_type": null,
+    "material": null,
+    "wallet_closure": null,
+    "verification_needed": [
+     "케이스 분리 후 측면 프레임 곡률 및 정확한 기종 확인"
+    ],
+    "features": "고양이 캐릭터 및 글귀 입체 케이스 · 후면 수직 배치 듀얼 카메라 · 전면 노치 디자인 디스플레이 · 문구 'How can cute cats make mistakes?'",
+    "evidence": [
+     "사진 1: 후면 수직 듀얼 카메라 및 고양이 그래픽 케이스",
+     "사진 2: 전면 노치 및 수신기 스피커 위치"
+    ],
+    "generation_evidence": [],
+    "same_item": true,
+    "confidence": {
+     "category": "높음",
+     "manufacturer": "높음",
+     "device_model": "보통",
+     "color": "높음"
+    },
+    "confidence_scores": {
+     "category": 0.9,
+     "manufacturer": 0.9,
+     "device_model": 0.6,
+     "color": 0.9
+    },
+    "prompt_version": "v1.3",
+    "model": "gemini-3.5-flash",
+    "description": "고양이 캐릭터 및 글귀 입체 케이스 · 후면 수직 배치 듀얼 카메라 · 전면 노치 디자인 디스플레이 · 문구 'How can cute cats make mistakes?'",
+    "analysis_id": "88c7a004b3ba42928173035a46b0ddc8",
+    "check_form": {
+     "category": {
+      "ai_value": "스마트폰",
+      "needs_check": false,
+      "check_reasons": []
+     },
+     "fields": [
+      {
+       "key": "brand",
+       "label": "브랜드",
+       "type": "choice",
+       "options": [
+        "애플",
+        "삼성",
+        "기타",
+        "모르겠음"
+       ],
+       "ai_value": "애플",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "device_model",
+       "label": "기종",
+       "type": "text",
+       "unknown_option": "모르겠음",
+       "help": "모르면 비워 두세요. AI가 추정한 기종과 후보가 함께 표시됩니다.",
+       "ai_value": "iPhone 12",
+       "needs_check": true,
+       "check_reasons": [
+        "대안 후보 있음",
+        "세대 구분 근거 없음"
+       ],
+       "suggestions": [
+        "iPhone 12",
+        "iPhone 11"
+       ]
+      },
+      {
+       "key": "color",
+       "label": "색상",
+       "type": "choice",
+       "options": [
+        "검정",
+        "흰색",
+        "회색",
+        "은색",
+        "빨강",
+        "주황",
+        "노랑",
+        "초록",
+        "파랑",
+        "남색",
+        "보라",
+        "분홍",
+        "갈색",
+        "베이지",
+        "금색",
+        "다색",
+        "모르겠음"
+       ],
+       "help": "케이스나 커버를 씌웠다면 겉으로 보이는 색",
+       "ai_value": "흰색",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_case",
+       "label": "케이스",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "ai_value": "있음",
+       "needs_check": false,
+       "check_reasons": []
+      },
+      {
+       "key": "has_card_wallet",
+       "label": "카드지갑 부착",
+       "type": "choice",
+       "options": [
+        "있음",
+        "없음",
+        "모르겠음"
+       ],
+       "help": "뒷면에 붙이는 카드지갑(MagSafe 카드지갑 등)",
+       "ai_value": "없음",
+       "needs_check": false,
+       "check_reasons": []
+      }
+     ],
+     "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+    },
+    "photo_hint": "측면(버튼 쪽) 사진을 추가하면 기종을 더 정확히 구분할 수 있어요."
+   }
+  }
+ ],
+ "server": {
+  "registration_analyzer_mode": "baze",
+  "analyzer": {
+   "ready": true,
+   "base_url": "https://factchat-cloud.mindlogic.ai/v1/gateway",
+   "model": "gemini-3.5-flash",
+   "prompt_version": "v1.3",
+   "error": null
+  }
+ }
+}

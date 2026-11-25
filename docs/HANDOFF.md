@@ -15,6 +15,7 @@ cp .env.example .env          # BAZE_API_KEY 입력 (기본 baze 모드, 모델�
 ```
 
 - 등록 분석 모드: `FINDYU_REGISTRATION_ANALYZER_MODE=baze(기본) | gemini | mock | vlm`
+- 등록·검색 체크 폼 (2026-11-25): `GET /form-schema`, 분석 응답의 `check_form`·`photo_hint`, `POST /items`의 `analysis_id`·`form_answers`, `POST /search`의 `category`·`filters` → `docs/API.md`. 품목에 이어폰 추가(DB v7, 프롬프트 v1.3)
   - `baze`: 학교 팩트챗(BAZE API Gateway)으로 Gemini 호출 (2026-11-25 추가, `baze_analyzer.py`). 모델은 `FINDYU_BAZE_MODEL`, 상태는 `GET /`의 `registration_baze`
 - Gemini 모델 변경: `FINDYU_GEMINI_MODEL=gemini-3.8-flash` 등
 - API 키가 없어도 서버는 뜬다. 분석 요청만 503과 함께 "GEMINI_API_KEY가 없습니다" 메시지로 실패한다. 상태는 `GET /`의 `registration_gemini`에서 확인할 수 있다.
