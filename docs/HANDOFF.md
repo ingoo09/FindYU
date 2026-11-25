@@ -9,12 +9,13 @@
 
 ```bash
 cd backend
-cp .env.example .env          # GEMINI_API_KEY 입력 (모델은 비우면 gemini-3.5-flash)
+cp .env.example .env          # BAZE_API_KEY 입력 (기본 baze 모드, 모델은 비우면 gemini-3.5-flash)
 .venv/bin/uvicorn main:app    # 첫 실행 시 findyu.db 자동 마이그레이션(v1~v6)
 .venv/bin/python -m pytest tests   # 단위 테스트 (API 키 불필요)
 ```
 
-- 등록 분석 모드: `FINDYU_REGISTRATION_ANALYZER_MODE=mock | vlm | gemini`
+- 등록 분석 모드: `FINDYU_REGISTRATION_ANALYZER_MODE=baze(기본) | gemini | mock | vlm`
+  - `baze`: 학교 팩트챗(BAZE API Gateway)으로 Gemini 호출 (2026-11-25 추가, `baze_analyzer.py`). 모델은 `FINDYU_BAZE_MODEL`, 상태는 `GET /`의 `registration_baze`
 - Gemini 모델 변경: `FINDYU_GEMINI_MODEL=gemini-3.8-flash` 등
 - API 키가 없어도 서버는 뜬다. 분석 요청만 503과 함께 "GEMINI_API_KEY가 없습니다" 메시지로 실패한다. 상태는 `GET /`의 `registration_gemini`에서 확인할 수 있다.
 - `backend/.venv`에 이번에 추가로 설치한 패키지: `langgraph`, `accelerate`, `pytest`, `google-genai`, `python-dotenv` (`requirements.txt`에 반영됨)
@@ -88,7 +89,9 @@ v1.2 부분 결과 2건 (판단 근거로는 부족):
 
 ## 4. 남은 작업
 
-### 4-1. 측정 이어하기 (`--resume`) — 미구현
+### 4-1. 측정 이어하기 (`--resume`) — 2026-11-25 완료
+- `--resume`, `--retry-failed` 구현. baze 게이트웨이로 3.5-flash·3.8-flash 조합당 3회 측정 완료 → `docs/model_comparison.md` 마지막 절
+- 아래는 당시 작업 계획 (기록용)
 - 지금 `compare_models.py`는 항상 처음부터 돈다. 이미 성공한 (회차, 조합)은 건너뛰고 실패·미측정분만 돌리는 `--resume <기존 결과 json>` 옵션이 필요하다.
 - 503/504로 실패한 회차를 마지막에 다시 돌려 조합당 3회를 채우는 기능도 함께 넣을 것
 - 완료 후 `docs/model_comparison.md`에 다음을 정리:
