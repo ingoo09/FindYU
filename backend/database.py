@@ -4,13 +4,17 @@ DB 연결 설정.
 나중에 진짜 서버에 배포할 때는 이 부분만 PostgreSQL 등으로 교체하면 됨.
 """
 
+import os
+from pathlib import Path
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 from paths import BASE_DIR
 
 # 실행 위치(CWD)와 무관하게 항상 backend/findyu.db를 사용
-DB_PATH = BASE_DIR / "findyu.db"
+# (테스트는 FINDYU_DB_PATH로 임시 DB를 쓴다: tests/conftest.py)
+DB_PATH = Path(os.getenv("FINDYU_DB_PATH") or BASE_DIR / "findyu.db")
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 engine = create_engine(
