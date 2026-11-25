@@ -73,7 +73,7 @@ cd frontend && npm install && npm run dev   # http://localhost:5173
 |---|---|---|---|---|
 | **PM·통합** | 최인구 | Codex | `docs/`(API.md 제외), `README.md`, `AGENTS.md`, `CLAUDE.md`, `demo/` | 통합 테스트, 시연 시나리오, 시연 데이터·정답표, 발표 자료, PR 병합 |
 | **AI** | 최준서 | Codex | `backend/prompts/`, `backend/*_analyzer.py`, `backend/scripts/`, `docs/model_comparison.md`, `docs/measurements/` | 프롬프트 개선, 분석 결과 검증, 정답표 기반 성능 측정, 검색 비교 어댑터 `backend/search_analyzer.py` |
-| **백엔드·DB** | 권기백 | **Claude Code** | `backend/` 전체(위 AI 경로 제외), `docs/API.md` | 목록 API 필터·페이지, 검색 점수 `similarity_score`로 변경, API 실패 시 `analysis_pending` |
+| **백엔드·DB** | 권기백 | **Claude Code** | `backend/` 전체(위 AI 경로 제외), `docs/API.md` | 게이트웨이 검색(임베딩 1차 선별 + Gemini 비교) 연결, 수동 등록(defer_analysis), 시연 데이터 임베딩 백필, API.md 관리 |
 | **프론트엔드** | 김승보 | Codex | `frontend/` (단, `frontend/src/dashboard/` 제외) | 등록·검색 화면, 품목별 체크 폼, 촬영 가이드, 결과 비교 화면 |
 | **대시보드** | 이수형 | Codex | `frontend/src/dashboard/` | 전체 습득물 최신순 목록, 장소·품목 필터, 상세 페이지, 발표용 통계 |
 
