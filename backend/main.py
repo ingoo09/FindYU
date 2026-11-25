@@ -51,6 +51,7 @@ from ai_retrieval import RetrievalModelManager, cosine_similarity_01
 from search_graph import run_search_graph
 from ai_query_parser import QueryParser
 import baze_analyzer
+import check_form
 import gemini_analyzer
 from gemini_analyzer import AnalyzerConfigError, AnalyzerError
 
@@ -536,6 +537,8 @@ def _batch_ask_vlm(image: Image.Image):
 
 _gemini_analyzer = gemini_analyzer.GeminiAnalyzer()
 _baze_analyzer = baze_analyzer.BazeAnalyzer()
+# /items/analyze 결과를 POST /items에서 다시 쓰기 위한 보관소 (check_form.AnalysisCache 참고)
+_analysis_cache = check_form.AnalysisCache()
 
 # 세 분석 모드가 공통으로 반환하는 키. 모드가 지원하지 않는 항목은 기본값으로 둔다.
 EMPTY_ANALYSIS = {
@@ -547,8 +550,11 @@ EMPTY_ANALYSIS = {
     "device_model_candidates": [],
     "identification_level": None,
     "has_case": None,
+    "has_card_wallet": None,
+    "earphone_components": None,
     "wallet_type": None,
     "material": None,
+    "wallet_closure": None,
     "verification_needed": [],
     "features": None,
     "evidence": [],
@@ -774,9 +780,16 @@ def serialize_item(item):
         "device_model_candidates": labels.load_str_list(item.device_model_candidates),
         "identification_level": item.identification_level,
         "has_case": item.has_case,
+        "has_card_wallet": item.has_card_wallet,
+        "earphone_components": item.earphone_components,
         "wallet_type": item.wallet_type,
         "material": item.material,
+        "wallet_closure": item.wallet_closure,
         "verification_needed": labels.load_str_list(item.verification_needed),
+        # 체크 폼 기준 값과 항목별 출처(human/ai)
+        "form_values": check_form.item_form_values(item),
+        "field_sources": json.loads(item.field_sources) if item.field_sources else {},
+        "analysis_model": item.analysis_model,
         "confidence": {
             "category": item.category_confidence,
             "manufacturer": item.manufacturer_confidence,
@@ -817,27 +830,39 @@ CONFIDENCE_FIELDS = [
 
 def apply_analysis(item, info: dict):
     """
-    분석 결과를 비어 있는 칸에만 채운다 (습득자가 직접 입력한 값은 덮어쓰지 않음).
+    분석 결과를 비어 있는 칸에만 채운다 (습득자가 고른 값은 덮어쓰지 않음 = 사람 > AI).
     확신도는 AI가 실제로 채운 항목에만 저장한다.
+    품목별 전용 항목(케이스, 지갑 종류 등)은 최종 품목에 해당할 때만 채운다
+    (습득자가 품목을 AI와 다르게 고른 경우 AI의 다른 품목 항목은 버림).
     """
+    filled = []
     scores = info.get("confidence_scores") or {}
     for column, confidence_column, key in CONFIDENCE_FIELDS:
         if getattr(item, column) is None and info.get(key) is not None:
             setattr(item, column, info[key])
             setattr(item, confidence_column, scores.get(key))
+            filled.append(column)
 
-    for column in ("brand", "identification_level", "wallet_type", "material"):
+    for column in (
+        "brand", "identification_level", "has_case", "has_card_wallet",
+        "earphone_components", "wallet_type", "material", "wallet_closure",
+    ):
+        if not check_form.column_allowed(column, item.category):
+            continue
         if getattr(item, column) is None and info.get(column) is not None:
             setattr(item, column, info[column])
-
-    if item.has_case is None and info.get("has_case") is not None:
-        item.has_case = info["has_case"]
+            filled.append(column)
 
     for column in ("device_model_candidates", "verification_needed"):
         if not getattr(item, column):
             setattr(item, column, labels.dump_str_list(info.get(column)))
 
     item.description = item.description or info.get("features")
+    item.field_sources = check_form.merge_sources(
+        item.field_sources, check_form.ai_sources(item, filled)
+    )
+    model = info.get("model") or REGISTRATION_ANALYZER_MODE
+    item.analysis_model = f"{REGISTRATION_ANALYZER_MODE}:{model}/{info.get('prompt_version') or '-'}"
 
 
 def analyze_registered_item(item_id: int):
@@ -865,8 +890,10 @@ def analyze_registered_item(item_id: int):
                 elif extra_file not in analysis_files:
                     analysis_files.append(extra_file)
 
-            info = extract_item_info([open_image(f) for f in analysis_files])
-            apply_analysis(item, info)
+            # 등록 전에 /items/analyze 결과를 이미 반영했다면(analysis_model 있음) 다시 호출하지 않는다
+            if item.analysis_model is None:
+                info = extract_item_info([open_image(f) for f in analysis_files])
+                apply_analysis(item, info)
             item.status = STATUS_REGISTERED
         except AnalyzerConfigError as exc:
             # API 키 누락 등 설정 문제: 스택트레이스 대신 해결 방법이 담긴 메시지만 남긴다
@@ -1020,15 +1047,18 @@ async def analyze_item_image(
 ):
     """
     습득물 사진(1장 이상)을 등록하기 전에 분석해 품명/색상/제조사/기종 등을 추출한다.
-    프론트엔드는 이 결과를 입력란에 자동 채우고, 사용자가 수정한 뒤 POST /items로 확정 등록한다.
+    프론트엔드는 check_form으로 체크 폼을 미리 채우고(needs_check 항목 강조),
+    습득자가 확인한 뒤 analysis_id와 함께 POST /items로 등록한다.
     """
     pil_images = []
+    blobs = []
     for upload in [image, *(extra_images or [])]:
         if upload is None or not upload.filename:
             continue
         image_bytes = await upload.read()
         if not image_bytes:
             continue
+        blobs.append(image_bytes)
         try:
             pil_images.append(open_image(io.BytesIO(image_bytes)))
         except Exception as exc:
@@ -1069,10 +1099,29 @@ async def analyze_item_image(
 
     result.pop("_raw_output", None)
 
+    form = check_form.build_check_form(result, image_count=len(pil_images))
+    analysis_id = _analysis_cache.put(result, check_form.image_digests(blobs))
+
     return {
         **result,
         "description": result["features"],
+        "analysis_id": analysis_id,
+        "check_form": form,
+        "photo_hint": form["photo_hint"],
     }
+
+
+@app.get("/form-schema")
+def get_form_schema(category: str = None):
+    """
+    품목별 체크 폼 항목과 선택지. category를 빼면 전 품목을 한 번에 준다.
+    모든 선택형 항목에 "모르겠음"이 있다 (등록: AI 값 사용 / 검색: 거르지 않음).
+    """
+    try:
+        normalized = check_form.validate_category(category)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return check_form.form_schema(normalized)
 
 
 @app.post("/items")
@@ -1092,6 +1141,8 @@ async def register_item(
     verification_needed: str = Form(None),      # JSON 배열 또는 쉼표 구분 문자열
     location: str = Form(None),
     occurred_at: str = Form(None),
+    analysis_id: str = Form(None),              # /items/analyze 응답의 analysis_id (선택)
+    form_answers: str = Form(None),             # 체크 폼에서 사람이 고른 값 {"color": "검정", ...} (JSON)
     image: UploadFile = File(...),                        # 대표 사진
     extra_images: list[UploadFile] | None = File(None),   # 같은 물품의 다른 각도 사진 (선택)
     db: Session = Depends(get_db),
@@ -1136,6 +1187,19 @@ async def register_item(
             detail=f"사진은 최대 {gemini_analyzer.MAX_IMAGES}장까지 등록할 수 있습니다.",
         )
 
+    # 같은 사진 묶음을 등록 전에 분석했다면 그 결과를 쓴다 (다른 사진이면 무시하고 등록 후 다시 분석)
+    cached_analysis = _analysis_cache.get(
+        analysis_id, check_form.image_digests([data for data, _ in uploads])
+    )
+    try:
+        human = check_form.resolve_answers(
+            check_form.parse_answers(form_answers),
+            fallback_category=labels.normalize_category(category)
+            or (cached_analysis or {}).get("category"),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     # 검증을 모두 통과한 뒤에 저장한다 (중간에 실패해도 파일이 남지 않도록)
     saved_paths = [save_uploaded_image(data, name) for data, name in uploads]
     saved_path = saved_paths[0]
@@ -1165,10 +1229,22 @@ async def register_item(
         ],
     )
 
+    # 우선순위: 체크 폼에서 사람이 고른 값 > 기존 입력란 값 > AI 값 (apply_analysis는 빈 칸만 채움)
+    sources = check_form.apply_human(new_item, human, cached_analysis)
+    legacy_human = {
+        key: check_form.SOURCE_HUMAN
+        for key, value in (("category", category), ("color", color), ("brand", manufacturer or brand))
+        if value and key not in sources
+    }
+    new_item.field_sources = check_form.merge_sources(None, legacy_human, sources)
+    if cached_analysis is not None:
+        apply_analysis(new_item, cached_analysis)
+
     db.add(new_item)
     db.commit()
     db.refresh(new_item)
 
+    # 검색 임베딩 계산 (분석 결과가 없으면 AI 분석도 함께)
     _analysis_queue.put(new_item.id)
 
     return serialize_item(new_item)
@@ -1195,10 +1271,16 @@ async def search_items(
     occurred_at: str = Form(None),
     image: UploadFile = File(None),
     top_k: int = Form(5),
+    category: str = Form(None),   # 체크 폼 품목 (스마트폰/이어폰/지갑/기타/모르겠음)
+    filters: str = Form(None),    # 체크 폼에서 분실자가 고른 값 {"color": "검정", ...} (JSON)
     db: Session = Depends(get_db),
 ):
     """
     AI 브랜치의 핵심 검색 구조를 demo FastAPI/SQLite에 통합.
+
+    체크 폼 필터: 분실자가 체크한 항목(category, filters)과 값이 다른 습득물은 후보에서 뺀다.
+    습득물 쪽 값이 비어 있으면(모름) 빼지 않고 filter_check에 "미확인"으로 표시한다.
+    순위는 남은 후보를 아래 점수로 매긴다.
 
     - Image -> Image: DINOv2
     - Text -> Image: SigLIP2
@@ -1207,6 +1289,11 @@ async def search_items(
     - Ranking weights: AI branch 0.45 / 0.25 / 0.20 / 0.10
     """
     top_k = max(1, min(int(top_k), 20))
+
+    try:
+        filter_category, form_filters = check_form.parse_filters(category, filters)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     query_image_embedding = None
     if image is not None and image.filename:
@@ -1256,12 +1343,22 @@ async def search_items(
     # Query LLM의 자연어 time은 현재 prototype에서 임의 날짜로 해석하지 않는다.
     query_time = parse_optional_datetime(occurred_at)
 
-    candidates = (
+    all_candidates = (
         db.query(models.Item)
         .filter(models.Item.item_type == "found")
         .filter(models.Item.status != STATUS_ANALYSIS_FAILED)
         .all()
     )
+    filter_checks = {}
+    candidates = []
+    for item in all_candidates:
+        checked = check_form.match_filters(item, filter_category, form_filters)
+        if checked is not None:
+            filter_checks[item.id] = checked
+            candidates.append(item)
+
+    def serialize_with_filters(item):
+        return {**serialize_item(item), "filter_check": filter_checks.get(item.id, {})}
 
     def candidate_image_score(item, query_vector):
         candidate_vector = item_embedding(item)
@@ -1279,7 +1376,7 @@ async def search_items(
         get_candidate_text_image_embedding=candidate_text_score,
         location_score_fn=location_similarity,
         time_score_fn=time_similarity,
-        serialize_fn=serialize_item,
+        serialize_fn=serialize_with_filters,
         query_location=effective_location,
         query_time=query_time,
         top_k=top_k,
@@ -1299,6 +1396,11 @@ async def search_items(
         "scoring_mode": "dinov2+siglip2+metadata+langgraph",
         "image_model": MODEL_NAME,
         "text_image_model": TEXT_IMAGE_MODEL_NAME,
+        "applied_filters": {
+            **({"category": filter_category} if filter_category else {}),
+            **{fld.key: fld.choice_from_column(value) or value for fld, value in form_filters},
+        },
+        "total_found_items": len(all_candidates),
         "total_candidates": len(candidates),
-        "results": graph_result.get("results", []),
+        "results": graph_result.get("results", []) if candidates else [],
     }
