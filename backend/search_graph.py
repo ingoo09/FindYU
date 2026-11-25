@@ -138,13 +138,16 @@ def run_search_graph(
                         if components["time"] is not None
                         else None
                     ),
+                    # 최종 점수. 확률이 아니므로 "%"·"일치율"로 보여주지 않는다 (AGENTS.md 7-2)
+                    "similarity_score": round(final_score, 4),
+                    # 이전 이름. 프론트가 similarity_score로 바꾸면 제거 (docs/REQUESTS.md)
                     "matching_score": round(final_score, 4),
                     "similarity": round(final_score, 4),
                     "scoring_mode": "dinov2+siglip2+metadata+langgraph",
                 }
             )
 
-        results.sort(key=lambda row: row["matching_score"], reverse=True)
+        results.sort(key=lambda row: row["similarity_score"], reverse=True)
         return {"results": results[:top_k]}
 
     graph = StateGraph(DemoSearchState)

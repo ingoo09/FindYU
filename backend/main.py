@@ -47,7 +47,7 @@ import models
 import labels
 from migrations import run_migrations
 from paths import UPLOAD_DIR, image_filename, resolve_image_path, to_stored_path
-from ai_retrieval import RetrievalModelManager, cosine_similarity_01
+from ai_retrieval import RetrievalModelManager, cosine_score
 from search_graph import run_search_graph
 from ai_query_parser import QueryParser
 import baze_analyzer
@@ -636,21 +636,6 @@ def extract_item_info(images: list[Image.Image]):
     }
 
 
-def cosine_similarity(vec1, vec2):
-    if not vec1 or not vec2 or len(vec1) != len(vec2):
-        return 0.0
-
-    dot = sum(a * b for a, b in zip(vec1, vec2))
-    norm1 = sum(a * a for a in vec1) ** 0.5
-    norm2 = sum(b * b for b in vec2) ** 0.5
-
-    if norm1 == 0 or norm2 == 0:
-        return 0.0
-
-    raw_cosine = dot / (norm1 * norm2)
-    return max(0.0, min(1.0, (raw_cosine + 1.0) / 2.0))
-
-
 def normalize_text(value: str | None) -> str:
     if not value:
         return ""
@@ -1033,11 +1018,13 @@ async def compare_images(
 
     emb1 = get_embedding(img1)
     emb2 = get_embedding(img2)
-    similarity = cosine_similarity_01(emb1, emb2)
+    score = cosine_score(emb1, emb2)
 
     return {
-        "similarity": round(similarity, 4),
-        "is_same_item": similarity >= 0.8,
+        "similarity_score": round(score, 4),
+        "similarity": round(score, 4),  # 이전 이름 (프론트 전환 후 제거 예정)
+        # 예전 기준 (cos + 1) / 2 >= 0.8 과 같은 기준 = 코사인 0.6 이상
+        "is_same_item": score >= 0.6,
         "scoring_mode": "dinov2+metadata",
     }
 
@@ -1397,11 +1384,11 @@ async def search_items(
 
     def candidate_image_score(item, query_vector):
         candidate_vector = item_embedding(item)
-        return cosine_similarity_01(query_vector, candidate_vector)
+        return cosine_score(query_vector, candidate_vector)
 
     def candidate_text_score(item, query_vector):
         candidate_vector = get_siglip_image_embedding(item)
-        return cosine_similarity_01(query_vector, candidate_vector)
+        return cosine_score(query_vector, candidate_vector)
 
     graph_result = run_search_graph(
         candidates=candidates,

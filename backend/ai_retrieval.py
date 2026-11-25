@@ -119,13 +119,20 @@ class RetrievalModelManager:
         return embedding.squeeze(0).cpu().tolist()
 
 
-def cosine_similarity_01(vec1, vec2):
+def cosine_score(vec1, vec2):
     """
-    L2-normalized embedding의 cosine을 metadata 점수와 합치기 쉽도록 [0, 1]로 변환.
+    두 임베딩의 코사인 유사도를 [0, 1]로 자른 값.
+    음수(서로 반대 방향)는 "닮지 않음"이므로 0으로 본다.
+
+    예전 cosine_similarity_01은 (cos + 1) / 2로 바꿔서 관련 없는 물품(cos 0.3 안팎)도
+    0.65 안팎이 되어 점수가 높아 보였다. 이제 코사인 값을 그대로 쓴다.
     """
     if not vec1 or not vec2 or len(vec1) != len(vec2):
         return 0.0
 
-    raw = sum(a * b for a, b in zip(vec1, vec2))
-    raw = max(-1.0, min(1.0, float(raw)))
-    return (raw + 1.0) / 2.0
+    dot = sum(a * b for a, b in zip(vec1, vec2))
+    norm1 = sum(a * a for a in vec1) ** 0.5
+    norm2 = sum(b * b for b in vec2) ** 0.5
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+    return max(0.0, min(1.0, float(dot / (norm1 * norm2))))
