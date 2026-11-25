@@ -119,7 +119,7 @@ def test_request_structure_multiple_images(env):
     assert "<!--" not in config.system_instruction  # 변경 이력 주석은 보내지 않음
 
     assert result["model"] == "test-model"
-    assert result["prompt_version"] == "v1.2"
+    assert result["prompt_version"] == ga.PROMPT_VERSION
 
 
 def test_falls_back_to_text_when_parsed_missing(env):
@@ -195,9 +195,39 @@ def test_normalize_wallet():
     assert result["confidence_scores"]["color"] == 0.3
 
 
+def test_normalize_phone_card_wallet_and_clears_other_category_fields():
+    result = ga.normalize_result(ga.IdentifyItemResult(**_payload(
+        has_card_wallet=True, earphone_components="케이스만", wallet_closure="지퍼",
+    )))
+    assert result["has_card_wallet"] is True
+    assert result["earphone_components"] is None
+    assert result["wallet_closure"] is None
+
+
+def test_normalize_earphone():
+    result = ga.normalize_result(ga.IdentifyItemResult(**_payload(
+        category="이어폰", device_model="AirPods Pro", has_case=True, has_card_wallet=True,
+        earphone_components="케이스+이어버드", color="흰색",
+    )))
+    assert result["category"] == "이어폰"
+    assert result["has_case"] is True  # 이어폰은 보호 커버
+    assert result["earphone_components"] == "케이스+이어버드"
+    assert result["has_card_wallet"] is None
+    assert (result["wallet_type"], result["material"]) == (None, None)
+
+
+def test_normalize_wallet_closure():
+    result = ga.normalize_result(ga.IdentifyItemResult(**_payload(
+        category="지갑", device_model=None, wallet_closure="똑딱이", has_case=True,
+    )))
+    assert result["wallet_closure"] == "똑딱이"
+    assert result["has_case"] is None
+
+
 def test_normalize_other_clears_specific_fields():
     result = ga.normalize_result(ga.IdentifyItemResult(**_payload(category="기타", color="미확인")))
     assert (result["has_case"], result["wallet_type"], result["material"]) == (None, None, None)
+    assert (result["has_card_wallet"], result["earphone_components"], result["wallet_closure"]) == (None, None, None)
     assert result["color"] == "미확인"
     assert result["confidence_scores"]["color"] is None
 
@@ -206,7 +236,9 @@ def test_schema_rejects_values_outside_lists():
     with pytest.raises(Exception):
         ga.IdentifyItemResult(**_payload(color="투명"))
     with pytest.raises(Exception):
-        ga.IdentifyItemResult(**_payload(category="이어폰"))
+        ga.IdentifyItemResult(**_payload(category="헤드폰"))
+    with pytest.raises(Exception):
+        ga.IdentifyItemResult(**_payload(earphone_components="이어버드 1개"))
     with pytest.raises(Exception):
         ga.IdentifyItemResult(**_payload(confidence={"category": "매우높음", "manufacturer": "높음", "device_model": "높음", "color": "높음"}))
 
@@ -229,7 +261,7 @@ def test_schema_converts_for_gemini():
 def test_prompt_lists_match_labels():
     prompt = ga.load_system_prompt()
     for value in (*labels.COLORS, *labels.MATERIALS, *labels.CATEGORIES, *labels.WALLET_TYPES,
-                  *labels.CONFIDENCE_LEVELS):
+                  *labels.CONFIDENCE_LEVELS, *labels.EARPHONE_COMPONENTS, *labels.WALLET_CLOSURES):
         assert value in prompt, f"프롬프트에 '{value}'가 없음"
 
     # 프롬프트 예시 JSON의 키 = 스키마 필드

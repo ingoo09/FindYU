@@ -7,13 +7,18 @@ import labels
     "raw, expected",
     [
         # 기존 findyu.db 값
-        ("이어폰 케이스", "기타"),
+        ("이어폰 케이스", "이어폰"),
         ("야구공", "기타"),
         ("스마트시계", "기타"),
-        ("갤럭시 버즈", "기타"),
-        ("에어팟", "기타"),
-        ("무선 이어폰", "기타"),
+        ("갤럭시 버즈", "이어폰"),
+        ("에어팟", "이어폰"),
+        ("무선 이어폰", "이어폰"),
         ("가방", "기타"),
+        # 이어폰 (v7): 이어폰 뒤의 케이스는 충전 케이스
+        ("에어팟 프로 케이스", "이어폰"),
+        ("AirPods Pro", "이어폰"),
+        ("갤럭시 버즈2 프로", "이어폰"),
+        ("버즈 케이스 낀 갤럭시", "스마트폰"),
         # 스마트폰
         ("스마트폰", "스마트폰"),
         ("휴대폰", "스마트폰"),
@@ -122,3 +127,20 @@ def test_enums_and_lists():
     assert labels.dump_str_list([]) is None
     assert labels.load_str_list('["카드 수납 개수"]') == ["카드 수납 개수"]
     assert labels.load_str_list("깨진값") == []
+
+
+@pytest.mark.parametrize("raw, expected", [
+    ("애플", "애플"), ("Apple", "애플"), ("삼성전자", "삼성"), ("Samsung", "삼성"),
+    ("구글", "기타"), ("모르겠음", None), ("", None), (None, None),
+])
+def test_normalize_brand_choice(raw, expected):
+    assert labels.normalize_brand_choice(raw) == expected
+
+
+def test_earphone_components_and_closure():
+    assert labels.normalize_earphone_components("케이스 + 이어버드") == "케이스+이어버드"
+    assert labels.normalize_earphone_components("충전 케이스") == "케이스만"
+    assert labels.normalize_earphone_components("유닛") == "이어버드만"
+    assert labels.normalize_earphone_components("모름") is None
+    assert labels.normalize_wallet_closure("스냅") == "똑딱이"
+    assert labels.normalize_wallet_closure("지퍼") == "지퍼"

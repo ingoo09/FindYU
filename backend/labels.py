@@ -1,5 +1,5 @@
 """
-휴대폰·지갑 전용 필드의 허용값과 정규화 함수.
+휴대폰·이어폰·지갑 전용 필드의 허용값과 정규화 함수.
 
 DB에는 한국어 라벨을 그대로 저장한다.
 """
@@ -11,19 +11,24 @@ import re
 # 품명 (category)
 # ---------------------------------------------------------
 CATEGORY_PHONE = "스마트폰"
+CATEGORY_EARPHONE = "이어폰"
 CATEGORY_WALLET = "지갑"
 CATEGORY_OTHER = "기타"
-CATEGORIES = (CATEGORY_PHONE, CATEGORY_WALLET, CATEGORY_OTHER)
+CATEGORIES = (CATEGORY_PHONE, CATEGORY_EARPHONE, CATEGORY_WALLET, CATEGORY_OTHER)
 
 # 단어 단위로 분류한다. 한국어 명사구는 마지막 명사가 중심이므로
 # "마지막으로 분류된 단어"가 품명을 결정한다.
 #   "아이폰 케이스" → 케이스(기타) / "케이스 낀 아이폰" → 아이폰(스마트폰)
-#   "갤럭시 버즈" → 버즈(기타)   / "갤럭시 S24" → 갤럭시(스마트폰)
+#   "갤럭시 버즈" → 버즈(이어폰) / "갤럭시 S24" → 갤럭시(스마트폰)
+# 예외: 이어폰 단어 뒤의 "케이스"는 이어폰 충전 케이스로 본다 ("에어팟 케이스" → 이어폰)
 _WALLET_WORDS = ("지갑", "wallet", "카드케이스", "카드홀더", "머니클립", "cardholder")
+# 무선 이어폰(이어버드)과 그 충전 케이스. 헤드폰·헤드셋은 기타
+_EARPHONE_WORDS = ("이어폰", "이어버드", "버즈", "에어팟", "earphone", "earbud", "airpod", "buds")
+_CASE_WORDS = ("케이스", "case")
 _OTHER_WORDS = (
-    "이어폰", "헤드폰", "헤드셋", "버즈", "에어팟", "워치", "시계", "태블릿", "아이패드",
+    "헤드폰", "헤드셋", "워치", "시계", "태블릿", "아이패드",
     "패드", "갤럭시탭", "노트북", "충전기", "케이블", "보조배터리", "케이스", "가방",
-    "백팩", "파우치", "우산", "열쇠", "카드", "earphone", "earbud", "airpods", "buds",
+    "백팩", "파우치", "우산", "열쇠", "카드",
     "watch", "tablet", "ipad", "laptop", "charger", "cable", "case", "bag",
 )
 _PHONE_EXACT = ("폰", "갤럭시", "galaxy", "phone", "smartphone", "cellphone", "휴대전화")
@@ -36,6 +41,8 @@ _PHONE_PREFIX = (
 def _classify_token(token: str) -> str | None:
     if any(word in token for word in _WALLET_WORDS):
         return CATEGORY_WALLET
+    if any(word in token for word in _EARPHONE_WORDS):
+        return CATEGORY_EARPHONE
     if any(word in token for word in _OTHER_WORDS):
         return CATEGORY_OTHER
     if token in _PHONE_EXACT or token.startswith(_PHONE_PREFIX):
@@ -44,7 +51,7 @@ def _classify_token(token: str) -> str | None:
 
 
 def normalize_category(value) -> str | None:
-    """자유 텍스트 품명 → 스마트폰 / 지갑 / 기타. 빈 값은 None."""
+    """자유 텍스트 품명 → 스마트폰 / 이어폰 / 지갑 / 기타. 빈 값은 None."""
     text = _clean(value).lower()
     if not text:
         return None
@@ -54,9 +61,17 @@ def normalize_category(value) -> str | None:
     decided = None
     for token in re.findall(r"[0-9a-z가-힣]+", text):
         label = _classify_token(token)
+        if decided == CATEGORY_EARPHONE and any(word in token for word in _CASE_WORDS):
+            continue  # "에어팟 케이스" = 이어폰 충전 케이스
         if label:
             decided = label
     return decided or CATEGORY_OTHER
+
+
+def is_earphone_text(value) -> bool:
+    """설명 등 자유 텍스트에 이어폰을 가리키는 단어가 있는지 (기존 데이터 재분류용)."""
+    text = _clean(value).lower()
+    return any(word in text for word in _EARPHONE_WORDS)
 
 
 # ---------------------------------------------------------
@@ -157,6 +172,59 @@ IDENTIFICATION_LEVELS = ("확인", "추정", "미확인")
 
 # 지갑 종류 (스마트폰/기타면 NULL)
 WALLET_TYPES = ("장지갑", "반지갑", "카드지갑")
+
+# 지갑 여밈 방식 (지갑만)
+WALLET_CLOSURES = ("지퍼", "똑딱이", "없음")
+
+# 이어폰 구성: 충전 케이스와 이어버드가 함께 있는지 (이어폰만)
+EARPHONE_COMPONENTS = ("케이스+이어버드", "케이스만", "이어버드만")
+
+# 체크 폼의 브랜드 선택지 (스마트폰·이어폰). DB의 manufacturer/brand 값을 이 중 하나로 묶어 비교한다
+BRAND_APPLE = "애플"
+BRAND_SAMSUNG = "삼성"
+BRAND_OTHER = "기타"
+BRAND_CHOICES = (BRAND_APPLE, BRAND_SAMSUNG, BRAND_OTHER)
+
+_BRAND_ALIASES = {
+    BRAND_APPLE: ("애플", "apple", "아이폰", "iphone", "에어팟", "airpods"),
+    BRAND_SAMSUNG: ("삼성", "samsung", "갤럭시", "galaxy"),
+}
+
+
+def normalize_brand_choice(value) -> str | None:
+    """'삼성전자', 'Apple' 등 → 애플 / 삼성 / 기타. 빈 값·모름은 None."""
+    text = _clean(value).lower().replace(" ", "")
+    if not text or text in {"모르겠음", "모름", "미확인", "unknown"}:
+        return None
+    for choice, aliases in _BRAND_ALIASES.items():
+        if any(alias in text for alias in aliases):
+            return choice
+    return BRAND_OTHER
+
+
+def normalize_wallet_closure(value) -> str | None:
+    text = _clean(value).replace(" ", "")
+    if not text:
+        return None
+    if text in WALLET_CLOSURES:
+        return text
+    aliases = {"zipper": "지퍼", "지퍼형": "지퍼", "스냅": "똑딱이", "단추": "똑딱이", "snap": "똑딱이", "button": "똑딱이"}
+    return aliases.get(text.lower())
+
+
+def normalize_earphone_components(value) -> str | None:
+    text = _clean(value).replace(" ", "")
+    if not text:
+        return None
+    if text in EARPHONE_COMPONENTS:
+        return text
+    if "케이스" in text and ("이어버드" in text or "유닛" in text or "본체" in text):
+        return "케이스+이어버드"
+    if "케이스" in text:
+        return "케이스만"
+    if "이어버드" in text or "유닛" in text:
+        return "이어버드만"
+    return None
 
 # 확신도: AI는 높음/보통/낮음으로 답하고, DB에는 숫자로 저장한다
 CONFIDENCE_SCORES = {"높음": 0.9, "보통": 0.6, "낮음": 0.3}

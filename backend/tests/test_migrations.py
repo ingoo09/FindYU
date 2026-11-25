@@ -84,7 +84,7 @@ def test_migrates_legacy_db(legacy_db):
 
     # 라벨 정규화
     assert _rows(legacy_db, ["category", "color"]) == [
-        ("기타", "다색"), ("기타", "흰색"), ("기타", "검정"),
+        ("이어폰", "다색"), ("이어폰", "흰색"), ("기타", "검정"),
     ]
 
     # 새 컬럼은 비어 있음
@@ -217,3 +217,19 @@ def test_rotated_image_embeddings_cleared(legacy_db, tmp_path, monkeypatch):
         (2, None),          # 회전 정보 있음 → 재계산 대상
         (3, "[0.5]"),       # 회전 정보 없음 → 유지
     ]
+
+
+def test_v7_adds_check_form_columns_and_moves_earphones(legacy_db):
+    """v6까지 적용된 DB(품명 '기타'에 이어폰이 섞여 있음) → v7에서 설명으로 이어폰 재분류."""
+    migrations.run_migrations(legacy_db)
+    conn = sqlite3.connect(legacy_db)
+    conn.execute("UPDATE items SET category = '기타'")
+    conn.execute("UPDATE items SET description = '갤럭시 버즈2 프로' WHERE id = 1")
+    conn.execute("UPDATE items SET description = NULL, brand = '에어팟' WHERE id = 2")
+    conn.execute("PRAGMA user_version = 6")
+    conn.commit()
+    conn.close()
+
+    assert migrations.run_migrations(legacy_db) == [7]
+    assert {name for name, _ in migrations.V7_COLUMNS} <= set(_columns(legacy_db))
+    assert _rows(legacy_db, ["category"]) == [("이어폰",), ("이어폰",), ("기타",)]

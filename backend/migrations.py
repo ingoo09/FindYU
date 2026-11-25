@@ -17,7 +17,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from labels import normalize_category, normalize_color
+from labels import CATEGORY_EARPHONE, CATEGORY_OTHER, is_earphone_text, normalize_category, normalize_color
 from paths import normalize_stored_path, resolve_image_path
 
 logger = logging.getLogger("findyu.migrations")
@@ -152,6 +152,32 @@ def _m6_clear_rotated_embeddings(conn: sqlite3.Connection):
     logger.warning("EXIF 회전 사진 임베딩 초기화(재계산 예정): %s", cleared or "없음")
 
 
+# v7에서 추가한 컬럼: 체크 폼 항목, 항목별 출처, 분석 모델
+V7_COLUMNS = [
+    ("has_card_wallet", "BOOLEAN"),
+    ("earphone_components", "VARCHAR"),
+    ("wallet_closure", "VARCHAR"),
+    ("field_sources", "TEXT"),
+    ("analysis_model", "VARCHAR"),
+]
+
+
+def _m7_check_form_columns(conn: sqlite3.Connection):
+    """체크 폼 컬럼 추가 + 품명 '이어폰' 신설에 따라 기존 '기타' 중 이어폰을 재분류."""
+    _add_columns(conn, V7_COLUMNS)
+    moved = []
+    rows = conn.execute(
+        "SELECT id, description, brand FROM items WHERE category = ?", (CATEGORY_OTHER,)
+    ).fetchall()
+    for item_id, description, brand in rows:
+        if is_earphone_text(description) or is_earphone_text(brand):
+            conn.execute(
+                "UPDATE items SET category = ? WHERE id = ?", (CATEGORY_EARPHONE, item_id)
+            )
+            moved.append(item_id)
+    logger.warning("기타 → 이어폰 재분류: %s", moved or "없음")
+
+
 MIGRATIONS = [
     (1, _m1_add_phone_wallet_columns),
     (2, _m2_normalize_image_paths),
@@ -159,6 +185,7 @@ MIGRATIONS = [
     (4, _m4_add_confidence_columns),
     (5, _m5_create_item_images),
     (6, _m6_clear_rotated_embeddings),
+    (7, _m7_check_form_columns),
 ]
 LATEST_VERSION = MIGRATIONS[-1][0]
 

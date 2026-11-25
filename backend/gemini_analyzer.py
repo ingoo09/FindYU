@@ -1,7 +1,7 @@
 """
 Gemini 기반 습득물 등록 분석 (FINDYU_REGISTRATION_ANALYZER_MODE=gemini).
 
-- 시스템 프롬프트: prompts/identify_item_v1.1.md
+- 시스템 프롬프트: prompts/identify_item_v1.3.md
 - 구조화 출력: response_schema(아래 IdentifyItemResult)로 JSON 구조와 허용값을 강제
 - 결과는 labels.py 기준으로 한 번 더 정규화하고, 품명과 맞지 않는 필드는 비운다
 
@@ -26,7 +26,7 @@ import labels
 
 logger = logging.getLogger("findyu.gemini")
 
-PROMPT_VERSION = "v1.2"
+PROMPT_VERSION = "v1.3"
 PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / f"identify_item_{PROMPT_VERSION}.md"
 
 # 2026-11 비교 결과(docs/model_comparison.md) 속도·안정성 기준으로 선택
@@ -46,7 +46,7 @@ class AnalyzerError(RuntimeError):
 
 
 # ---------------------------------------------------------
-# 응답 스키마 (프롬프트 v1.1의 출력 형식과 일치)
+# 응답 스키마 (프롬프트 v1.3의 출력 형식과 일치)
 # ---------------------------------------------------------
 Confidence = Literal["높음", "보통", "낮음"]
 
@@ -67,7 +67,7 @@ class GenerationEvidence(BaseModel):
 
 class IdentifyItemResult(BaseModel):
     same_item: Optional[bool] = None
-    category: Literal["스마트폰", "지갑", "기타"]
+    category: Literal[labels.CATEGORIES]  # type: ignore[valid-type]
     manufacturer: Optional[str] = None
     brand: Optional[str] = None
     device_model: Optional[str] = None
@@ -79,9 +79,13 @@ class IdentifyItemResult(BaseModel):
     confidence: ConfidenceByField
     device_model_candidates: list[str] = Field(default_factory=list, max_length=2)
     verification_needed: list[str] = Field(default_factory=list, max_length=3)
+    # 스마트폰: 케이스 / 이어폰: 충전 케이스에 씌운 보호 커버
     has_case: Optional[bool] = None
-    wallet_type: Optional[Literal["장지갑", "반지갑", "카드지갑"]] = None
+    has_card_wallet: Optional[bool] = None  # 스마트폰 뒷면 카드지갑 부착
+    earphone_components: Optional[Literal[labels.EARPHONE_COMPONENTS]] = None  # type: ignore[valid-type]
+    wallet_type: Optional[Literal[labels.WALLET_TYPES]] = None  # type: ignore[valid-type]
     material: Optional[Literal[labels.MATERIALS]] = None  # type: ignore[valid-type]
+    wallet_closure: Optional[Literal[labels.WALLET_CLOSURES]] = None  # type: ignore[valid-type]
 
 
 def load_system_prompt(path: Path = PROMPT_PATH) -> str:
@@ -297,7 +301,15 @@ def normalize_result(result: IdentifyItemResult, image_count: int | None = None)
     )
     features = _clean_list(result.features, 5)
 
-    has_case = result.has_case if category == labels.CATEGORY_PHONE else None
+    is_phone = category == labels.CATEGORY_PHONE
+    is_earphone = category == labels.CATEGORY_EARPHONE
+    is_wallet = category == labels.CATEGORY_WALLET
+    has_case = result.has_case if (is_phone or is_earphone) else None
+    has_card_wallet = result.has_card_wallet if is_phone else None
+    earphone_components = (
+        labels.normalize_earphone_components(result.earphone_components) if is_earphone else None
+    )
+    wallet_closure = labels.normalize_wallet_closure(result.wallet_closure) if is_wallet else None
     wallet_type = (
         labels.normalize_wallet_type(result.wallet_type)
         if category == labels.CATEGORY_WALLET
@@ -334,8 +346,11 @@ def normalize_result(result: IdentifyItemResult, image_count: int | None = None)
         "device_model_candidates": candidates,
         "identification_level": identification_level,
         "has_case": has_case,
+        "has_card_wallet": has_card_wallet,
+        "earphone_components": earphone_components,
         "wallet_type": wallet_type,
         "material": material,
+        "wallet_closure": wallet_closure,
         "verification_needed": verification_needed,
         "features": " · ".join(features) if features else None,
         "evidence": _clean_list(result.evidence, 4),

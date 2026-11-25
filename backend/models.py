@@ -28,7 +28,10 @@ class Item(Base):
     device_model = Column(String, nullable=True)             # 기종 (예: 아이폰 15 Pro)
     device_model_candidates = Column(Text, nullable=True)    # 기종 대안 후보 (JSON 배열)
     identification_level = Column(String, nullable=True)     # 확인 / 추정 / 미확인
-    has_case = Column(Boolean, nullable=True)                # 케이스 유무 (NULL=판단 불가)
+    has_case = Column(Boolean, nullable=True)                # 케이스 유무 (이어폰은 보호 커버, NULL=판단 불가)
+    has_card_wallet = Column(Boolean, nullable=True)         # 스마트폰 카드지갑 부착 (v7)
+    earphone_components = Column(String, nullable=True)      # 케이스+이어버드 / 케이스만 / 이어버드만 (v7)
+    wallet_closure = Column(String, nullable=True)           # 지퍼 / 똑딱이 / 없음 (v7)
     wallet_type = Column(String, nullable=True)              # 장지갑 / 반지갑 / 카드지갑
     material = Column(String, nullable=True)                 # 소재
     verification_needed = Column(Text, nullable=True)        # 추가 확인 필요 사항 (JSON 배열)
@@ -39,6 +42,11 @@ class Item(Base):
     manufacturer_confidence = Column(Float, nullable=True)
     device_model_confidence = Column(Float, nullable=True)
     color_confidence = Column(Float, nullable=True)
+
+    # 체크 폼 항목별 출처 {"color": "human", "has_case": "ai", ...} (JSON, v7)
+    field_sources = Column(Text, nullable=True)
+    # 자동 분석에 쓴 모델·프롬프트 (예: "baze:gemini-3.5-flash/v1.3"). NULL이면 아직 분석 전 (v7)
+    analysis_model = Column(String, nullable=True)
 
     # 이미지
     # image_path는 대표 사진(검색 임베딩 기준). 등록된 사진 전체는 images(item_images 테이블)
