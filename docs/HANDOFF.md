@@ -131,6 +131,32 @@ d1f3595 docs: 앞선 모델 비교 측정 원본 3건 보관
 
 ## 4. 남은 작업
 
+### 4-0. 게이트웨이 검색·수동 등록 — 2026-11-25 진행 중 (`feature/backend-gemini-search`)
+해커톤 구현명세(백엔드 B1·B2) 기준. 자세한 계약은 `docs/API.md` "게이트웨이 검색", "수동 등록".
+- **완료 (mock·테스트로 확인)**
+  - `POST /items`의 `defer_analysis=true`: 등록 분석 호출 0회, 바로 `registered`
+  - 등록 후 백그라운드에서 사진 임베딩(`gemini-embedding-2`, 256차원) 1회 시도, 실패하면 비워 둠. DB v8 `image_embedding_gemini`·`image_embedding_model` (기존 DINOv2 `embedding`과 분리)
+  - 사진은 `image_url` 객체로 보내고 장당 토큰 1,000 초과면 오류 (글자로 처리되는 경우 방지)
+  - `/search`(baze·mock): 체크 폼 필터 → 비교 후보 최대 10건(사진: 임베딩 상위 + 남은 자리 명세 순서 / 자연어: 명세 순서) → 검색 어댑터 1회 → ID 검증 → Top-5. 구형 점수 필드는 `null`, `rank`·`match_reasons`·`evaluated_count` 추가
+  - baze·mock에서는 서버 시작·등록·검색에 로컬 모델(DINOv2·SigLIP2·Qwen)을 불러오지 않음. 기존 방식은 `FINDYU_SEARCH_ANALYZER_MODE=local`로 남김
+  - 수동 백필 `backend/tools/backfill_gemini_embeddings.py` (호출 수를 보여주고 확인받은 뒤 실행, 서버 시작 시 자동 실행 안 함)
+  - 테스트가 실제 DB를 쓰지 않도록 `FINDYU_DB_PATH`·`FINDYU_UPLOAD_DIR` 추가 (`tests/conftest.py`)
+- **검색 모드 기본값은 `mock`** (`search_adapter.DEFAULT_MODE`). AI의 `search_analyzer.py`가 병합되면 `baze`로 바꾼다. 기존 `.env`를 쓰는 팀원이 병합 후 검색 503을 겪지 않게 하기 위함
+- **실제 게이트웨이 확인 (2026-11-25, 호출 5회, 등록 분석 gemini-3.5-flash)**
+  | 확인 | 결과 |
+  |---|---|
+  | 일반 등록 15 Pro (후면+측면) | 등록 → 분석·임베딩 완료 9.9초, 256차원 저장 |
+  | 일반 등록 iPhone 12 (후면+전면) | 등록 → 분석·임베딩 완료 9.9초, 256차원 저장 |
+  | 사진 검색 (15 Pro 측면 side1) 검색 사진 임베딩 | 1.9초. 후보 9건 중 임베딩 있는 2건: 15 Pro 0.909 > iPhone 12 0.700, 나머지 7건은 명세 순서(최신순)로 채움 |
+  - 비교 단계는 `search_analyzer.py`가 없어 측정하지 못했다. **사진 검색 1회 전체 시간(임베딩 + 비교)은 어댑터 병합 후 측정 필요**
+  - 기존 물품 7건은 사진 임베딩이 없다 → 필요하면 백필 도구 (`FINDYU_SEARCH_ANALYZER_MODE=baze`로 실행, 7건 = 게이트웨이 2회)
+- **남은 것**
+  - AI 담당의 `backend/search_analyzer.py` (함수 형태는 `docs/REQUESTS.md` 2026-11-25 요청). 병합되면 검색 기본값을 `baze`로
+  - 실제 게이트웨이 확인: 사진 검색 전체 응답 시간(임베딩 + 비교), 자연어 검색, Argon 전환 (E2E-05)
+  - 프론트: 점수 % 대신 순위·`match_reasons`, 분석 실패 시 `defer_analysis` (`docs/REQUESTS.md`)
+- **공통 명세와 다른 점 (팀 결정)**: 사진 검색 후보를 명세 순서가 아니라 사진 임베딩 상위 10건으로 먼저 고른다
+- 중단: `analysis_pending` 재시도는 명세 변경으로 중단. 로컬 브랜치 `feature/backend-analysis-pending`에만 커밋(push·PR 안 함)
+
 ### 4-1. 이어폰
 - **실제 이어폰 사진으로 측정한 적이 없다.** 프롬프트 v1.3의 이어폰 분류·구성·보호커버 판단, 체크 폼 AI 값이 맞는지 확인 필요. 에어팟·버즈 사진(케이스 닫힘/열림, 커버 유무)을 `test_photos`에 추가하고 `compare_models.py`의 `COMBOS`에 조합을 넣을 것
 - 이어폰 기종(예: AirPods Pro 2, Galaxy Buds2 Pro)을 체크 폼에 둘지 정해야 한다. 지금은 AI가 `device_model`을 채울 수는 있지만 이어폰 폼에는 기종 항목이 없다
@@ -160,7 +186,7 @@ d1f3595 docs: 앞선 모델 비교 측정 원본 3건 보관
 - `POST /compare`의 `is_same_item`은 같은 기준 유지 (예전 0.8 = 코사인 0.6)
 - **남은 것 (프론트)**: 후보 카드·대시보드가 아직 `matching_score`를 "%"로 보여준다. `similarity_score`로 바꾸고 순위나 높음/보통/낮음으로 표시 (`docs/REQUESTS.md`). 높음/보통/낮음 구간은 측정 필요
 
-### 4-5. 503/429 대비
+### 4-5. 503/429 대비 — 해커톤 명세에서는 재처리 큐 없이 수동 등록(`defer_analysis`)으로 대응 (4-0)
 현재 동작:
 - gemini 모드는 SDK가, baze 모드는 `baze_analyzer`가 429/5xx를 최대 3회 재시도 (`HttpRetryOptions`, 초기 2초, 최대 10초)
 - 재시도 후에도 실패하면, 등록 분석 작업은 해당 습득물을 `analysis_failed`로 만듦 → **검색 대상에서 빠지고 자동으로 다시 분석되지도 않음**

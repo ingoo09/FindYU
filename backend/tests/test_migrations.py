@@ -230,6 +230,16 @@ def test_v7_adds_check_form_columns_and_moves_earphones(legacy_db):
     conn.commit()
     conn.close()
 
-    assert migrations.run_migrations(legacy_db) == [7]
+    assert migrations.run_migrations(legacy_db) == list(range(7, migrations.LATEST_VERSION + 1))
     assert {name for name, _ in migrations.V7_COLUMNS} <= set(_columns(legacy_db))
     assert _rows(legacy_db, ["category"]) == [("이어폰",), ("이어폰",), ("기타",)]
+
+
+def test_v8_adds_gemini_embedding_columns_without_touching_dinov2(legacy_db):
+    migrations.run_migrations(legacy_db)
+    assert migrations.get_version(legacy_db) >= 8
+    assert {name for name, _ in migrations.V8_COLUMNS} <= set(_columns(legacy_db))
+    # 기존 DINOv2 임베딩은 그대로, 새 칸은 비어 있음
+    assert _rows(legacy_db, ["embedding", "image_embedding_gemini", "image_embedding_model"]) == [
+        ("[0.1, 0.2]", None, None), ("[0.3]", None, None), (None, None, None),
+    ]

@@ -47,6 +47,10 @@ class Item(Base):
     field_sources = Column(Text, nullable=True)
     # 자동 분석에 쓴 모델·프롬프트 (예: "baze:gemini-3.5-flash/v1.3"). NULL이면 아직 분석 전 (v7)
     analysis_model = Column(String, nullable=True)
+    # 사진 검색용 Gemini 이미지 임베딩 (대표 사진, JSON 배열, v8). 기존 embedding(DINOv2)과 따로 둔다
+    image_embedding_gemini = Column(Text, nullable=True)
+    # 위 임베딩을 만든 모델 (예: "gemini-embedding-2@256", 테스트는 "mock-pixels@256"). 다른 모델 벡터와 섞지 않기 위함
+    image_embedding_model = Column(String, nullable=True)
 
     # 이미지
     # image_path는 대표 사진(검색 임베딩 기준). 등록된 사진 전체는 images(item_images 테이블)

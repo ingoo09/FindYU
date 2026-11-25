@@ -1,6 +1,7 @@
 # FindYU 백엔드 API
 
-- [검색 점수](#검색-점수-similarity_score-2026-11-25-변경) · [물품 목록](#get-items--물품-목록) · [장소 선택지](#get-itemslocations--장소-필터-선택지)
+- **[게이트웨이 검색](#post-search--게이트웨이-검색-baze--mock)** · [수동 등록 `defer_analysis`](#수동-등록-defer_analysis) · [환경 설정](#환경-설정)
+- [물품 목록](#get-items--물품-목록) · [장소 선택지](#get-itemslocations--장소-필터-선택지) · [검색 점수 (local 모드)](#검색-점수-similarity_score-2026-11-25-변경)
 - 체크 폼: [form-schema](#get-form-schema) · [등록 분석](#post-itemsanalyze) · [등록](#post-items-추가된-필드) · [검색](#post-search-추가된-필드)
 
 ## 체크 폼
@@ -172,6 +173,7 @@
 |---|---|
 | `analysis_id` (선택) | `/items/analyze` 응답의 id. **같은 사진 묶음**(순서는 무관, 대표 사진을 바꿔도 됨)일 때만 그 분석 결과를 쓴다. 다른 사진이거나 만료됐으면 무시하고 등록 후 백그라운드에서 다시 분석 |
 | `form_answers` (선택) | 사람이 고른 값. JSON 객체 `{"category": "스마트폰", "device_model": "iPhone 15 Pro", "color": "모르겠음"}` |
+| `defer_analysis` (선택) | `true`면 등록 분석을 부르지 않고 바로 `registered`로 저장한다 (아래 "수동 등록"). `true`/`false` 외의 값은 400 |
 
 저장 규칙
 - **우선순위: `form_answers`(사람) > 기존 입력란(`category`, `color`, `brand` 등) > AI 값.** AI 값은 빈 칸만 채운다.
@@ -237,6 +239,8 @@ curl -F item_type=found \
 
 ### 검색 점수 `similarity_score` (2026-11-25 변경)
 
+> **`FINDYU_SEARCH_ANALYZER_MODE=local`(기존 로컬 모델 검색)에서만 해당한다.** baze·mock 게이트웨이 검색에서는 이 필드들이 모두 `null`이다 ([게이트웨이 검색](#post-search--게이트웨이-검색-baze--mock)).
+
 | 필드 | 의미 |
 |---|---|
 | `similarity_score` | 최종 점수 0~1. 아래 항목 중 **값이 있는 것만** 가중 평균: 이미지 0.45 / 텍스트 0.25 / 장소 0.20 / 시간 0.10. 결과는 이 값의 내림차순 |
@@ -287,6 +291,116 @@ curl -F image=@15pro_side2.jpeg -F category=스마트폰 \
 - `filters`만 있고 `category`가 없음 → `400 filters를 쓰려면 category를 함께 보내야 합니다.`
 - 품목에 없는 항목 → `400 'has_case'는 품목 '지갑'의 검색 항목이 아닙니다.`
 - 선택지에 없는 값 → `400 색상: '투명'는 선택지에 없습니다 (...)`
+
+---
+
+## 수동 등록 `defer_analysis`
+
+AI 분석을 쓸 수 없을 때(게이트웨이 오류 등) 프론트가 사람이 입력한 값으로 바로 등록하는 경로 (공통 명세 3절, 백엔드 명세 B1).
+
+- `POST /items`에 `defer_analysis=true`를 보내면 **등록 분석을 부르지 않고**(호출 0회) 사진·입력값을 저장한 뒤 바로 `status: "registered"`와 실제 `id`를 돌려준다. 새 상태·마이그레이션·재처리 큐는 없다.
+- 같은 사진 묶음에 유효한 `analysis_id`가 함께 오면 그 분석 결과는 재사용한다 (다시 호출하지 않음).
+- 저장 직후 백그라운드에서 **사진 검색 임베딩만 1회 시도**한다. 실패하면 비워 두고 등록 결과에는 영향이 없다 (일반 등록도 같음).
+- 수동 등록 물품도 목록·상세·검색 후보에 바로 나온다.
+
+```bash
+curl -F item_type=found -F image=@back.jpg -F extra_images=@side.jpg \
+     -F defer_analysis=true \
+     --form-string 'form_answers={"category":"지갑","wallet_type":"반지갑","color":"갈색"}' \
+     -F location=IT관 http://127.0.0.1:8000/items
+```
+
+```json
+{"id": 21, "status": "registered", "category": "지갑", "wallet_type": "반지갑", "color": "갈색",
+ "field_sources": {"category": "human", "wallet_type": "human", "color": "human"},
+ "analysis_model": null, "...": "(GET /items/{id}와 같은 나머지 필드)"}
+```
+
+---
+
+## POST /search — 게이트웨이 검색 (baze · mock)
+
+`FINDYU_SEARCH_ANALYZER_MODE=baze` 또는 `mock`(**현재 기본값**)일 때의 검색. 기본값은 AI 담당의 `backend/search_analyzer.py`가 병합될 때까지 `mock`이다 (병합되면 `baze`로 바꾼다). 로컬 검색 모델(DINOv2·SigLIP2·Qwen)을 불러오지 않는다. 요청 필드는 그대로다 (`image` 또는 `description`, 선택 `category`·`filters`·`location`·`occurred_at`·`top_k`).
+
+### 흐름
+
+1. **체크 폼 필터**: 위 "POST /search (추가된 필드)"와 같은 규칙 (`일치`·`미확인`, `total_candidates` 의미 동일). `analysis_failed`는 제외, 수동 등록은 포함.
+2. **비교 후보 최대 10건** (`evaluated_count`)
+   - **사진 검색**: 검색 사진의 임베딩(게이트웨이 1회)과 저장된 사진 임베딩의 코사인 유사도 상위부터. 임베딩이 없는 물품(수동 등록 중 실패·백필 전 물품, 다른 모델의 임베딩)은 **남은 자리를 명세 순서로** 채운다. 대표 사진을 읽을 수 없는 물품은 건너뛴다. 후보 중 임베딩이 있는 물품이 하나도 없으면 검색 사진 임베딩도 부르지 않는다.
+   - **자연어 검색**: 명세 순서. 문장→사진 임베딩은 쓰지 않는다. 대표 사진을 읽을 수 없어도 저장된 외형 문장·체크 폼 값으로 비교한다.
+   - **명세 순서**: 요청한 `location`과 부분 일치 → `occurred_at`과 습득 시각이 가까운 순 → 등록 최신순(`created_at`, `id`). 입력하지 않은 기준은 건너뛴다.
+   - **공통 명세와 다른 점 (2026-11-25 팀 결정)**: 명세는 사진 검색도 명세 순서로만 고르지만, 여기서는 사진 임베딩 상위 10건을 먼저 고른다.
+3. **검색 비교 한 번**: 검색 입력과 후보 묶음(ID, 품목, 외형 문장, 체크 폼 값, 장소, 습득 시각, 대표 사진 JPEG)을 검색 어댑터에 보낸다. 파일 경로·URL은 보내지 않는다. mock은 받은 순서를 그대로 돌려준다.
+4. **검증·결합**: 어댑터가 돌려준 ID가 보낸 후보 안에 있고 중복이 없는지 검사한다 (어긋나면 전체 502). 결과 순서가 순위이며 **Top-5 이내**(`top_k`는 1~5로 자름). 어댑터가 일부 후보만 돌려주는 것은 허용한다.
+
+- 후보가 0건이면 AI를 부르지 않고 200과 `results: []`.
+- 사진·설명 없이 필터만 보내면 AI를 부르지 않고 명세 순서로 `top_k`건 (`evaluated_count: 0`).
+
+### 응답
+
+| 필드 | 설명 |
+|---|---|
+| `results[]` | 물품 객체(`GET /items/{id}`와 같음) + 아래 필드. **배열 순서 = 순위** |
+| `results[].rank` | 1부터 |
+| `results[].match_reasons` | 모델이 낸 짧은 비교 근거 (최대 3개, 없으면 `[]`) |
+| `results[].filter_check` | 체크 폼 항목별 `"일치"` / `"미확인"` |
+| `results[].selection_source` | `"embedding"`(사진 임베딩 상위로 뽑힘) / `"order"`(명세 순서로 뽑힘) |
+| `results[].similarity_score`, `matching_score`, `similarity`, `image_similarity`, `text_similarity`, `location_score`, `time_score` | **전환 기간 동안 항상 `null`.** 화면은 이 값을 쓰지 말고 순위(`rank`)와 `match_reasons`를 보여준다. 프론트 전환이 끝나면 필드를 지운다 |
+| `search_kind` | `"image"` / `"text"` / `"filter_only"` |
+| `search_analyzer_mode` | `"baze"` / `"mock"` |
+| `embedding_model` | 사진 검색에 쓴 임베딩 모델 (예: `"gemini-embedding-2@256"`), 자연어 검색이면 `null` |
+| `applied_filters`, `total_found_items`, `total_candidates` | 위와 같음 |
+| `evaluated_count` | 비교에 보낸 후보 수 (최대 10) |
+| `selection` | `{"by_embedding": 3, "by_order": 1}` 비교 후보가 어떻게 뽑혔는지 |
+| `timings` | `{"embedding_ms": 820, "compare_ms": 4100, "total_ms": 5010}` (호출하지 않은 단계는 없음) |
+
+```json
+{
+  "query_description": null,
+  "query_location": "IT관",
+  "query_occurred_at": null,
+  "search_kind": "image",
+  "search_analyzer_mode": "baze",
+  "embedding_model": "gemini-embedding-2@256",
+  "applied_filters": {"category": "이어폰"},
+  "total_found_items": 30,
+  "total_candidates": 6,
+  "evaluated_count": 6,
+  "selection": {"by_embedding": 5, "by_order": 1},
+  "timings": {"embedding_ms": 820, "compare_ms": 4100, "total_ms": 5010},
+  "results": [
+    {
+      "id": 12, "category": "이어폰", "location": "IT관(E21)", "image_url": "/uploads/....jpg",
+      "rank": 1,
+      "match_reasons": ["흰색 충전 케이스 형태가 유사함"],
+      "filter_check": {"category": "일치", "has_cover": "미확인"},
+      "selection_source": "embedding",
+      "similarity_score": null, "matching_score": null, "similarity": null,
+      "image_similarity": null, "text_similarity": null, "location_score": null, "time_score": null,
+      "...": "(GET /items/{id}와 같은 나머지 필드)"
+    }
+  ]
+}
+```
+
+(`timings` 값은 형식 예시다. 실제 측정값은 확인 후 `docs/HANDOFF.md`에 적는다)
+
+### 오류
+
+| 상황 | 응답 |
+|---|---|
+| 필터·`category` 값 오류, 읽을 수 없는 검색 사진 | 400 |
+| 게이트웨이 호출 실패·응답 이상 (임베딩, 비교), 어댑터가 계약과 다른 결과 (보내지 않은 ID, 중복, 형식) | **502** `{"detail": "..."}` |
+| 설정 문제 (`BAZE_API_KEY` 없음, AI 검색 어댑터 `backend/search_analyzer.py`가 아직 없음) | **503** |
+| 조회 결과 0건 | 200, `results: []` (오류 아님) |
+
+### 사진 임베딩
+
+- 모델 `gemini-embedding-2`, 256차원. 대표 사진 1장을 긴 변 1024px JPEG로 줄여 `{"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,..."}}` 객체로 보낸다.
+- 응답의 `usage.prompt_tokens`가 **사진 1장당 1,000을 넘으면 오류(502)**로 본다. 사진으로 처리되면 장당 258토큰이고, data URL을 문자열로 보내 글자로 처리되면 18만 토큰이 나온다 (2026-11-25 실험). 게이트웨이가 200을 주면서 엉뚱한 벡터를 돌려주는 경우를 막기 위한 검사다.
+- 등록 후 백그라운드에서 1회 시도하고, 실패하면 비워 둔다. 기존 `embedding`(DINOv2) 칸과 따로 `image_embedding_gemini`·`image_embedding_model`(DB v8)에 저장해 섞지 않는다. 다른 모델로 만든 임베딩은 검색에서 "없음"으로 본다.
+- 비어 있는 물품은 수동 백필로 채운다 (서버 시작 때 자동 실행 안 함):
+  `FINDYU_SEARCH_ANALYZER_MODE=baze .venv/bin/python tools/backfill_gemini_embeddings.py` → 대상 수와 게이트웨이 호출 수를 보여주고 확인받은 뒤 실행 (`--dry-run`, `--batch`). 모드를 주지 않으면 서버와 같은 기본값(mock)으로 API 없이 채운다
 
 ---
 
@@ -386,3 +500,21 @@ curl -F image=@15pro_side2.jpeg -F category=스마트폰 \
 - 품목이 `스마트폰 / 이어폰 / 지갑 / 기타`로 바뀌었다. 무선 이어폰과 충전 케이스가 이어폰이고, 헤드폰은 기타다.
 - 마이그레이션 v7: 새 컬럼(`has_card_wallet`, `earphone_components`, `wallet_closure`, `field_sources`, `analysis_model`)을 추가한다. 기존 `기타` 중 설명·브랜드에 이어폰 단어(버즈, 에어팟, 이어폰 등)가 있는 물품은 `이어폰`으로 바꾼다.
 - 프롬프트 v1.3: 이어폰 분류와 새 항목을 추가했다. 스마트폰 기종 식별 규칙(Step 4)과 식별수준 규칙은 v1.2와 같다.
+
+---
+
+## 환경 설정
+
+| 환경변수 | 값 | 기본 |
+|---|---|---|
+| `FINDYU_REGISTRATION_ANALYZER_MODE` | `baze` / `gemini` / `mock` / `vlm` | `baze` |
+| `FINDYU_SEARCH_ANALYZER_MODE` | `baze`(게이트웨이 임베딩 + 검색 어댑터) / `mock`(API 호출 없음, 테스트·개발) / `local`(기존 DINOv2·SigLIP2) | **`mock`** (`search_analyzer.py` 병합 전까지) |
+| `BAZE_API_KEY`, `FINDYU_BAZE_BASE_URL`, `FINDYU_BAZE_MODEL` | 등록 분석과 검색 비교가 함께 쓴다 | |
+| `FINDYU_EMBEDDING_MODEL` | 사진 임베딩 모델 | `gemini-embedding-2` |
+| `FINDYU_EMBEDDING_DIMENSIONS` | 임베딩 차원 | `256` |
+| `FINDYU_EMBEDDING_TIMEOUT` | 임베딩 요청 제한 시간(초) | `60` |
+| `FINDYU_DB_PATH`, `FINDYU_UPLOAD_DIR` | DB 파일·업로드 폴더 위치 (테스트용) | `backend/findyu.db`, `backend/uploads` |
+
+- `baze` 검색은 AI 담당의 `backend/search_analyzer.py`가 있어야 동작한다 (없으면 503). 그래서 병합 전까지 기본값은 `mock`이고, 병합되면 백�d가 기본값을 `baze`로 바꾼다 (`search_adapter.DEFAULT_MODE`).
+- `mock` 검색은 사진 임베딩도 API 없이 만들기 때문에, mock으로 저장된 임베딩은 `baze`로 바꾼 뒤 "없음"으로 취급된다 (모델이 다름). 필요하면 백필 도구로 다시 채운다.
+- 테스트(`pytest`)는 `tests/conftest.py`가 임시 DB·업로드 폴더와 `mock` 모드를 정한다. 실제 DB와 API를 쓰지 않는다.

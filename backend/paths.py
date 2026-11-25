@@ -7,11 +7,13 @@
 - 과거 Windows에서 저장된 "uploads\\파일명.jpg" 같은 값도 resolve_image_path로 읽을 수 있다.
 """
 
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR_NAME = "uploads"
-UPLOAD_DIR = BASE_DIR / UPLOAD_DIR_NAME
+# 테스트에서 임시 폴더를 쓰도록 바꿀 수 있다 (DB에는 여전히 "uploads/<파일명>"으로 저장)
+UPLOAD_DIR = Path(os.getenv("FINDYU_UPLOAD_DIR") or BASE_DIR / UPLOAD_DIR_NAME)
 
 
 def image_filename(stored_path: str | None) -> str | None:
