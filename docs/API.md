@@ -1,4 +1,9 @@
-# FindYU 백엔드 API — 체크 폼
+# FindYU 백엔드 API
+
+- [물품 목록](#get-items--물품-목록) · [장소 선택지](#get-itemslocations--장소-필터-선택지)
+- 체크 폼: [form-schema](#get-form-schema) · [등록 분석](#post-itemsanalyze) · [등록](#post-items-추가된-필드) · [검색](#post-search-추가된-필드)
+
+## 체크 폼
 
 등록·검색 화면의 **품목별 체크 폼**과 관련된 API를 정리한다. 챗봇처럼 하나씩 묻지 않고, 품목별 항목과 선택지를 한 화면에 보여준다.
 
@@ -264,6 +269,97 @@ curl -F image=@15pro_side2.jpeg -F category=스마트폰 \
 - `filters`만 있고 `category`가 없음 → `400 filters를 쓰려면 category를 함께 보내야 합니다.`
 - 품목에 없는 항목 → `400 'has_case'는 품목 '지갑'의 검색 항목이 아닙니다.`
 - 선택지에 없는 값 → `400 색상: '투명'는 선택지에 없습니다 (...)`
+
+---
+
+## GET /items — 물품 목록
+
+통합 Dashboard의 목록 화면용. 필터 + 등록 시각 정렬 + 페이지 나누기. (2026-11-25 변경: 응답이 배열에서 객체로 바뀜)
+
+| 쿼리 (모두 선택) | 값 | 기본 |
+|---|---|---|
+| `item_type` | `found`(습득물) / `lost`(분실물) | 전체 |
+| `category` | `스마트폰` / `이어폰` / `지갑` / `기타`. `모르겠음`이면 거르지 않음 | 전체 |
+| `location` | 장소 **부분 일치** (예: `IT관` → "IT관(E21)", "IT관 2층"). 영문 대소문자 무시, `%`·`_`는 글자 그대로 비교 | 전체 |
+| `status` | `analyzing`(AI 분석 중) / `registered`(등록 완료) / `analysis_failed`(분석 실패) | 전체 |
+| `page` | 1부터 | 1 |
+| `page_size` | 1~100 | 20 |
+| `sort` | `newest`(최신 등록순) / `oldest` | `newest` |
+
+- 정렬은 등록 시각(`created_at`) 기준이고, 같으면 `id`로 순서를 고정한다 (페이지를 넘겨도 순서가 흔들리지 않음).
+- 마지막 페이지를 넘는 `page`는 오류가 아니라 빈 `items`를 준다.
+- 잘못된 값은 400. 예: `{"detail": "page_size는 1~100 사이여야 합니다."}`
+- `items[]`의 각 물품은 `GET /items/{id}`와 같은 형식이다 (`form_values`, `field_sources`, `images` 포함).
+
+### 예시: `GET /items?item_type=found&page_size=3`
+
+```json
+{
+  "items": [
+    {
+      "id": 9,
+      "item_type": "found",
+      "category": "기타",
+      "color": "검정",
+      "brand": "SQ",
+      "description": "흰둥이 키링이 달려 있음",
+      "location": "과학도서관(F24)",
+      "occurred_at": null,
+      "status": "registered",
+      "created_at": "2026-10-04T10:17:11",
+      "image_url": "/uploads/....jpg",
+      "images": [{"position": 0, "image_url": "/uploads/....jpg"}],
+      "form_values": {"category": "기타", "color": "검정"},
+      "field_sources": {},
+      "...": "(GET /items/{id}와 같은 나머지 필드)"
+    }
+  ],
+  "total": 7,
+  "page": 1,
+  "page_size": 3,
+  "total_pages": 3,
+  "has_next": true,
+  "sort": "newest",
+  "filters": {"item_type": "found"}
+}
+```
+
+- `total`: 필터를 적용한 전체 개수 (현재 페이지 개수가 아님)
+- `filters`: 실제로 적용한 필터 (빈 값·`모르겠음`은 빠짐)
+
+### 예시: `GET /items?item_type=found&category=이어폰&location=IT관`
+
+```json
+{"items": [...], "total": 2, "page": 1, "page_size": 20, "total_pages": 1, "has_next": false,
+ "sort": "newest", "filters": {"item_type": "found", "category": "이어폰", "location": "IT관"}}
+```
+
+---
+
+## GET /items/locations — 장소 필터 선택지
+
+등록된 장소와 물품 수. 장소는 자유 입력이라, Dashboard의 장소 필터 선택지를 만들 때 쓴다.
+
+| 쿼리 | 값 |
+|---|---|
+| `item_type` (선택) | `found` / `lost`. 없으면 전체 |
+
+- 앞뒤 공백을 지운 장소별로 센다. 빈 장소는 빠진다.
+- 물품이 많은 순, 같으면 이름순.
+- 선택한 장소를 `GET /items?location=<장소>`로 넘기면 부분 일치로 거른다.
+
+### 예시: `GET /items/locations?item_type=found`
+
+```json
+{
+  "locations": [
+    {"location": "IT관(E21)", "count": 4},
+    {"location": "과학도서관(F24)", "count": 1},
+    {"location": "상경관(B02)", "count": 1},
+    {"location": "전기관(E22)", "count": 1}
+  ]
+}
+```
 
 ---
 
