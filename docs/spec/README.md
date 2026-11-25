@@ -24,3 +24,9 @@
 | 사진 검색 후보 10건 선별 | 장소 일치 → 시각 근접 → 최신순 | BAZE `gemini-embedding-2` 사진 유사도 순으로 고르고, 남은 자리는 명세 순서로 채움 (PR #12). **자연어 검색은 명세 그대로** |
 | `FINDYU_SEARCH_ANALYZER_MODE` 기본값 | `mock`(테스트) / `baze`(운영) 구분 | AI의 `backend/search_analyzer.py`가 병합되기 전까지 기본값 `mock` |
 | API 계약 | 명세의 필드·흐름 | **정확한 계약은 `docs/API.md`가 우선**한다 |
+
+## 해커톤 착수 자료
+
+- [역할별 시작 프롬프트](START_PROMPTS.md)
+- [5시간 구현 실행 계획](plans/2026-11-25-findyu-hackathon.md)
+- [팀원 준비·전달 체크리스트](plans/2026-11-25-findyu-team-inputs.md)
