@@ -27,6 +27,6 @@
 
 ## 해커톤 착수 자료
 
-- [역할별 시작 프롬프트](START_PROMPTS.md)
+- [복사해서 쓰는 공통 시작 프롬프트](START_PROMPTS.md)
 - [5시간 구현 실행 계획](plans/2026-11-25-findyu-hackathon.md)
 - [팀원 준비·전달 체크리스트](plans/2026-11-25-findyu-team-inputs.md)
