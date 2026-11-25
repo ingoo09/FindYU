@@ -1,0 +1,261 @@
+[
+ {
+  "model": "gemini-3.8-flash",
+  "truth": "iPhone 15 Pro",
+  "combo": "후면만",
+  "photos": [
+   "15pro_back.jpeg"
+  ],
+  "resized_retry": true,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 502,
+    "elapsed": 182.5
+   },
+   {
+    "resized": true,
+    "status": 200,
+    "elapsed": 87.5
+   }
+  ],
+  "status": 200,
+  "body": {
+   "category": "스마트폰",
+   "color": "검정",
+   "manufacturer": "애플",
+   "brand": "애플",
+   "device_model": "iPhone Pro 시리즈",
+   "device_model_candidates": [
+    "iPhone 14 Pro",
+    "iPhone 15 Pro"
+   ],
+   "identification_level": "추정",
+   "has_case": true,
+   "wallet_type": null,
+   "material": null,
+   "verification_needed": [
+    "케이스 탈거 후 본체 측면 프레임 및 충전 단자 형태 확인",
+    "전면 디스플레이(다이내믹 아일랜드 여부) 확인",
+    "설정 내 모델명 정보 확인"
+   ],
+   "features": "투명 젤리 케이스 장착 · 후면 검정 가죽 맥세이프 카드지갑 부착 · 트리플 카메라 및 LiDAR 센서 구성 · 케이스 테두리 황변 변색",
+   "evidence": [
+    "사진 1: 후면 트리플 카메라 섬 배열과 LiDAR 센서로 애플 아이폰 Pro 계열 확인",
+    "사진 1: 투명 케이스 뒷면에 검정색 카드지갑이 자석으로 부착되어 있음"
+   ],
+   "same_item": true,
+   "confidence": {
+    "category": "높음",
+    "manufacturer": "높음",
+    "device_model": "보통",
+    "color": "보통"
+   },
+   "confidence_scores": {
+    "category": 0.9,
+    "manufacturer": 0.9,
+    "device_model": 0.6,
+    "color": 0.6
+   },
+   "prompt_version": "v1.1",
+   "model": "gemini-3.8-flash",
+   "description": "투명 젤리 케이스 장착 · 후면 검정 가죽 맥세이프 카드지갑 부착 · 트리플 카메라 및 LiDAR 센서 구성 · 케이스 테두리 황변 변색"
+  }
+ },
+ {
+  "model": "gemini-3.8-flash",
+  "truth": "iPhone 15 Pro",
+  "combo": "후면+전면",
+  "photos": [
+   "15pro_back.jpeg",
+   "15pro_front.jpeg"
+  ],
+  "resized_retry": false,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 200,
+    "elapsed": 96.9
+   }
+  ],
+  "status": 200,
+  "body": {
+   "category": "스마트폰",
+   "color": "검정",
+   "manufacturer": "애플",
+   "brand": "애플",
+   "device_model": "iPhone Pro 시리즈",
+   "device_model_candidates": [
+    "iPhone 15 Pro",
+    "iPhone 14 Pro"
+   ],
+   "identification_level": "추정",
+   "has_case": true,
+   "wallet_type": null,
+   "material": null,
+   "verification_needed": [
+    "케이스 탈거 후 하단 충전 단자 규격(Lightning 또는 USB-C) 확인",
+    "측면 무음 스위치 또는 동작 버튼 유무 확인",
+    "설정 앱 내 모델명 확인"
+   ],
+   "features": "후면 트리플 카메라 및 LiDAR 센서 · 변색된 투명 범퍼 케이스 착용 · 후면 부착형 검정 가죽 맥세이프 카드지갑 · 모서리 둥근 평면 디스플레이",
+   "evidence": [
+    "사진 1에서 인덕션 형태의 트리플 카메라와 센서 배열 확인",
+    "사진 1에서 후면에 부착된 검정색 카드지갑과 변색된 케이스 확인",
+    "사진 2에서 전면 일체형 디스플레이 및 케이스 장착 상태 확인"
+   ],
+   "same_item": true,
+   "confidence": {
+    "category": "높음",
+    "manufacturer": "높음",
+    "device_model": "보통",
+    "color": "보통"
+   },
+   "confidence_scores": {
+    "category": 0.9,
+    "manufacturer": 0.9,
+    "device_model": 0.6,
+    "color": 0.6
+   },
+   "prompt_version": "v1.1",
+   "model": "gemini-3.8-flash",
+   "description": "후면 트리플 카메라 및 LiDAR 센서 · 변색된 투명 범퍼 케이스 착용 · 후면 부착형 검정 가죽 맥세이프 카드지갑 · 모서리 둥근 평면 디스플레이"
+  }
+ },
+ {
+  "model": "gemini-3.8-flash",
+  "truth": "iPhone 15 Pro",
+  "combo": "후면+측면(side2)",
+  "photos": [
+   "15pro_back.jpeg",
+   "15pro_side2.jpeg"
+  ],
+  "resized_retry": false,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 200,
+    "elapsed": 88.4
+   }
+  ],
+  "status": 200,
+  "body": {
+   "category": "스마트폰",
+   "color": "검정",
+   "manufacturer": "애플",
+   "brand": "애플",
+   "device_model": "iPhone 15 Pro",
+   "device_model_candidates": [
+    "iPhone 14 Pro",
+    "iPhone 13 Pro"
+   ],
+   "identification_level": "추정",
+   "has_case": true,
+   "wallet_type": null,
+   "material": null,
+   "verification_needed": [
+    "설정 내 정보 화면(모델명) 확인",
+    "하단 충전 포트 규격(USB-C 또는 Lightning) 확인",
+    "케이스 및 카드지갑 분리 후 본체 외관 및 각인 확인"
+   ],
+   "features": "후면 검정색 맥세이프 카드지갑 부착 · 투명 범퍼 케이스 착용 (테두리 변색) · 트리플 카메라 및 LiDAR 스캐너 · 측면 액션 버튼 형태 확인 · 본체 후면 상단 은색/실버 색상 노출",
+   "evidence": [
+    "사진 1에서 후면 트리플 카메라 섬과 라이다 스캐너 구조로 iPhone Pro 라인업 확인",
+    "사진 1에서 케이스 후면에 부착된 스크래치 있는 검정색 가죽 카드지갑 확인",
+    "사진 2에서 측면 음소거 스위치 자리에 액션 버튼 형태가 적용된 케이스 구조 관찰",
+    "사진 1, 2에서 동일한 투명 변색 케이스와 카드지갑이 부착된 기기 확인"
+   ],
+   "same_item": true,
+   "confidence": {
+    "category": "높음",
+    "manufacturer": "높음",
+    "device_model": "보통",
+    "color": "보통"
+   },
+   "confidence_scores": {
+    "category": 0.9,
+    "manufacturer": 0.9,
+    "device_model": 0.6,
+    "color": 0.6
+   },
+   "prompt_version": "v1.1",
+   "model": "gemini-3.8-flash",
+   "description": "후면 검정색 맥세이프 카드지갑 부착 · 투명 범퍼 케이스 착용 (테두리 변색) · 트리플 카메라 및 LiDAR 스캐너 · 측면 액션 버튼 형태 확인 · 본체 후면 상단 은색/실버 색상 노출"
+  }
+ },
+ {
+  "model": "gemini-3.8-flash",
+  "truth": "iPhone 15 Pro",
+  "combo": "5장 전체",
+  "photos": [
+   "15pro_back.jpeg",
+   "15pro_back_hand.jpeg",
+   "15pro_front.jpeg",
+   "15pro_side1.jpeg",
+   "15pro_side2.jpeg"
+  ],
+  "resized_retry": true,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 502,
+    "elapsed": 185.8
+   },
+   {
+    "resized": true,
+    "status": 502,
+    "elapsed": 184.2
+   }
+  ],
+  "status": 502,
+  "body": {
+   "detail": "Gemini API 오류 (504): Deadline expired before operation could complete."
+  }
+ },
+ {
+  "model": "gemini-3.8-flash",
+  "truth": "iPhone 12",
+  "combo": "후면만",
+  "photos": [
+   "iphone12_back.jpeg"
+  ],
+  "resized_retry": true,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 502,
+    "elapsed": 182.4
+   },
+   {
+    "resized": true,
+    "status": 502,
+    "elapsed": 66.0
+   }
+  ],
+  "status": 502,
+  "body": {
+   "detail": "Gemini 요청 한도를 초과했습니다 (재시도 후에도 실패, 429): You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://aistudio.google.com/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.8-flash, description: Generate content requests per day limit exceeded on Free Tier. See https://aistudio.google.com/docs/rate-limits.\nPlease retry in 3h51m38.058437774s."
+  }
+ },
+ {
+  "model": "gemini-3.8-flash",
+  "truth": "iPhone 12",
+  "combo": "후면+전면",
+  "photos": [
+   "iphone12_back.jpeg",
+   "iphone12_front.jpeg"
+  ],
+  "resized_retry": false,
+  "attempts": [
+   {
+    "resized": false,
+    "status": 502,
+    "elapsed": 8.9
+   }
+  ],
+  "status": 502,
+  "body": {
+   "detail": "Gemini 요청 한도를 초과했습니다 (재시도 후에도 실패, 429): You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://aistudio.google.com/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.8-flash, description: Generate content requests per day limit exceeded on Free Tier. See https://aistudio.google.com/docs/rate-limits.\nPlease retry in 3h51m29.188812558s."
+  }
+ }
+]
