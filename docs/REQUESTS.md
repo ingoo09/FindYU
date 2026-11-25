@@ -1,0 +1,1 @@
+- [백엔드→PM] CLAUDE.md 3절 '목록 API 필터·페이지' 완료 표시 / `feature/backend-list-api`에서 구현 (docs/API.md 참고) / 보통
