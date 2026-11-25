@@ -14,3 +14,4 @@
   - 빈 결과 예시: `{"results": []}` (백엔드는 후보 0건이면 부르지 않음)
 - [백엔드→프론트엔드] (2026-11-25) 게이트웨이 검색에서 점수 필드(`similarity_score`, `matching_score`, `similarity`, `image_similarity`, `text_similarity`, `location_score`, `time_score`)는 항상 `null`입니다. 위 '점수 %' 요청 대신, 결과 배열 순서(`rank`)와 `match_reasons`를 보여 주세요. 등록 분석이 실패하면 `defer_analysis=true`로 직접 입력값 등록 가능 / docs/API.md "게이트웨이 검색", "수동 등록" / 급함
 - [백엔드→PM] (2026-11-25) CLAUDE.md 3절 정리: 'API 실패 시 analysis_pending'은 명세 변경으로 중단(로컬 브랜치 `feature/backend-analysis-pending`에만 커밋, push 안 함), 대신 '게이트웨이 검색·수동 등록'이 `feature/backend-gemini-search`에서 진행 중 / 보통
+- [백엔드→AI] baze_analyzer.py 기본 모델 gemini-3.5-flash를 명세대로 gemini-3.8-flash로 / AGENTS.md·명세와 불일치 / 보통

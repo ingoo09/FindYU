@@ -13,6 +13,7 @@
 2. 아래 **3. 역할별 담당 범위**에서 내 역할이 수정할 수 있는 경로를 확인한다.
 3. `git status`와 `git branch --show-current`로 현재 브랜치를 확인한다. `main`이면 작업하지 말고 사용자에게 알린다. 작업 브랜치는 최신 `main`에서 만든다.
 4. `docs/API.md`가 있으면 먼저 읽는다. 프론트·대시보드·AI는 이 문서를 기준으로 백엔드와 연결한다.
+5. `docs/spec/00_공통.md`와 자기 역할 명세를 읽는다.
 
 ---
 
@@ -39,8 +40,9 @@
 | 영역 | 기술 | 위치 |
 |---|---|---|
 | Backend | Python, FastAPI, SQLAlchemy, SQLite | `backend/` |
-| 등록 분석 AI | 학교 BAZE API(OpenAI 호환) → Gemini 계열 | `backend/*_analyzer.py`, `backend/prompts/` |
-| 검색 AI | DINOv2(이미지), SigLIP2(텍스트→이미지), Qwen3(검색어 해석), LangGraph | `backend/ai_retrieval.py`, `backend/search_graph.py`, `backend/ai_query_parser.py` |
+| 등록 분석 AI | 학교 BAZE API(OpenAI 호환) → Gemini 계열 (개발 `gemini-3.8-flash` / 실사용 `gemini-4-argon`) | `backend/*_analyzer.py`, `backend/prompts/` |
+| 검색 AI | BAZE 임베딩(`gemini-embedding-2`) 1차 선별 + Gemini 비교(순위·근거) | `backend/gemini_embedding.py`, `backend/search_candidates.py`, `backend/search_adapter.py`, `backend/search_analyzer.py` |
+| 로컬 검색 | DINOv2·SigLIP2 (`FINDYU_SEARCH_ANALYZER_MODE=local` 비상용) | `backend/ai_retrieval.py`, `backend/search_graph.py`, `backend/ai_query_parser.py` |
 | Frontend | React 18 + Vite | `frontend/` |
 
 ```bash
@@ -56,6 +58,7 @@ cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
 - 등록 분석 모드: `FINDYU_REGISTRATION_ANALYZER_MODE` = `mock` | `vlm` | `gemini` | `baze`
+- 검색 모드: `FINDYU_SEARCH_ANALYZER_MODE` = `mock` | `baze` | `local`
 - **개발·테스트 중에는 `mock` 모드를 쓴다.** 코드와 `.env.example`의 기본값은 `baze`이므로, `backend/.env`에서 `FINDYU_REGISTRATION_ANALYZER_MODE=mock`으로 바꾼다. 실제 API는 기능 확인이 필요할 때만 호출한다.
 - 검색어 해석(`FINDYU_QUERY_PARSER_MODE`)도 기본값 `llm`은 로컬 Qwen3 모델을 내려받아 실행한다. 가볍게 돌리려면 `mock`으로 둔다.
 - `findyu.db`는 서버 시작 시 자동 마이그레이션된다. 직접 수정하지 않는다.
@@ -69,7 +72,7 @@ cd frontend && npm install && npm run dev   # http://localhost:5173
 | 역할 | 담당자 | 에이전트 | 수정 가능한 경로 | 이번 해커톤 핵심 작업 |
 |---|---|---|---|---|
 | **PM·통합** | 최인구 | Codex | `docs/`(API.md 제외), `README.md`, `AGENTS.md`, `CLAUDE.md`, `demo/` | 통합 테스트, 시연 시나리오, 시연 데이터·정답표, 발표 자료, PR 병합 |
-| **AI** | 최준서 | Codex | `backend/prompts/`, `backend/*_analyzer.py`, `backend/scripts/`, `docs/model_comparison.md`, `docs/measurements/` | 프롬프트 개선, 분석 결과 검증, 정답표 기반 성능 측정 |
+| **AI** | 최준서 | Codex | `backend/prompts/`, `backend/*_analyzer.py`, `backend/scripts/`, `docs/model_comparison.md`, `docs/measurements/` | 프롬프트 개선, 분석 결과 검증, 정답표 기반 성능 측정, 검색 비교 어댑터 `backend/search_analyzer.py` |
 | **백엔드·DB** | 권기백 | **Claude Code** | `backend/` 전체(위 AI 경로 제외), `docs/API.md` | 목록 API 필터·페이지, 검색 점수 `similarity_score`로 변경, API 실패 시 `analysis_pending` |
 | **프론트엔드** | 김승보 | Codex | `frontend/` (단, `frontend/src/dashboard/` 제외) | 등록·검색 화면, 품목별 체크 폼, 촬영 가이드, 결과 비교 화면 |
 | **대시보드** | 이수형 | Codex | `frontend/src/dashboard/` | 전체 습득물 최신순 목록, 장소·품목 필터, 상세 페이지, 발표용 통계 |
@@ -127,7 +130,7 @@ cd frontend && npm install && npm run dev   # http://localhost:5173
 ## 7. 제품 원칙 (모든 역할 공통)
 
 1. **모르면 지어내지 않는다.** AI가 확실하지 않은 제조사·기종은 `null` 또는 "미확인"으로 둔다.
-2. **점수를 확률처럼 보여주지 않는다.** 검색 점수는 `similarity_score`로 부르고 "%" "확률" "일치율" 같은 표현을 쓰지 않는다. 화면에는 순위나 "유사도 높음/보통/낮음" 정도만 보여준다.
+2. **점수를 확률처럼 보여주지 않는다.** 검색 결과는 순위와 `match_reasons`로 보여주고 점수를 %로 보여주지 않는다.
 3. **최종 판단은 사람이 한다.** 소유권을 AI가 확정하지 않는다.
 4. **사람이 고른 값이 AI 값보다 우선이다.**
 5. **개인정보를 화면·응답·로그에 그대로 내보내지 않는다.** 전화번호, 학번, 이름, 카드번호, 기기 일련번호(이어폰 뚜껑 안쪽 등)는 출력하지 않는다.

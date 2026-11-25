@@ -26,9 +26,18 @@
 
 ## 3. 남은 할 일
 
-- [ ] **목록 API 필터·페이지**: `GET /items`가 지금은 전체 물품을 한 번에 돌려준다. 품목·장소·상태 필터와 페이지 나누기 추가
-- [ ] **검색 점수를 `similarity_score`로 변경**: 지금의 `matching_score`/`similarity` 이름을 바꾸고, 코사인 값을 `(x + 1) / 2`로 바꾸는 변환(`backend/ai_retrieval.py`의 `cosine_similarity_01`)을 없앤다. 이 변환 때문에 관련 없는 물품도 60%대 점수가 나온다
-- [ ] **API 실패 시 `analysis_pending`**: 등록 분석 API가 429/503 등으로 실패하면 `analysis_failed` 대신 `analysis_pending`으로 두고 나중에 다시 분석한다. 지금은 `analysis_failed`가 되어 검색에서 빠지고 다시 분석되지도 않는다
+완료:
+- `GET /items` 목록·필터·페이지네이션, `/items/locations`
+- `GET /form-schema`, 분석 응답 `needs_check`·`photo_hint`
+- 검색 필터(`filters`·`filter_check`), `similarity_score` 전환
+- 이어폰 품목·마이그레이션
+- `defer_analysis` 수동 등록, 사진 임베딩(DB v8), 게이트웨이 검색 연결 (PR #12)
+- `analysis_pending`: 명세 변경으로 중단, `defer_analysis`로 대체
+
+남은 일 (우선순위 순):
+1) AI의 `search_analyzer.py` 병합 후 검색 기본값 `baze` 전환, 테스트 수정, 사진 검색 전체 시간 측정
+2) 시연 데이터 등록 후 backfill 도구로 임베딩 채우기 (`--dry-run` 먼저)
+3) `docs/REQUESTS.md` 백엔드 요청 처리
 
 ## 4. 진행 상황 기록
 
