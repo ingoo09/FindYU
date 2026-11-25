@@ -40,6 +40,7 @@ import os
 import queue
 import re
 import threading
+import time
 import uuid
 
 from database import DB_PATH, engine, Base, get_db, SessionLocal
@@ -52,7 +53,10 @@ from search_graph import run_search_graph
 from ai_query_parser import QueryParser
 import baze_analyzer
 import check_form
+import gemini_embedding
 import item_list
+import search_adapter
+import search_candidates
 import gemini_analyzer
 from gemini_analyzer import AnalyzerConfigError, AnalyzerError
 
@@ -70,6 +74,11 @@ REGISTRATION_ANALYZER_MODE = os.getenv(
     "FINDYU_REGISTRATION_ANALYZER_MODE",
     "baze",
 ).lower()
+# search_analyzer_mode: "baze"(기본, 게이트웨이 임베딩 + Gemini 비교) | "mock"(API 호출 없음) | "local"(기존 DINOv2·SigLIP2)
+# baze·mock에서는 로컬 검색 모델을 불러오지 않는다
+SEARCH_ANALYZER_MODE = os.getenv("FINDYU_SEARCH_ANALYZER_MODE", "baze").strip().lower()
+if SEARCH_ANALYZER_MODE not in {"baze", "mock", "local"}:
+    raise RuntimeError("FINDYU_SEARCH_ANALYZER_MODE는 baze, mock, local 중 하나여야 합니다.")
 
 app = FastAPI(title="FindYU Backend - Midterm Demo")
 
@@ -540,6 +549,8 @@ _gemini_analyzer = gemini_analyzer.GeminiAnalyzer()
 _baze_analyzer = baze_analyzer.BazeAnalyzer()
 # /items/analyze 결과를 POST /items에서 다시 쓰기 위한 보관소 (check_form.AnalysisCache 참고)
 _analysis_cache = check_form.AnalysisCache()
+# 사진 검색용 이미지 임베딩 (baze: 게이트웨이 / mock: API 없음 / local: 없음, DINOv2 사용)
+_embedder = gemini_embedding.make_embedder(SEARCH_ANALYZER_MODE)
 
 # 세 분석 모드가 공통으로 반환하는 키. 모드가 지원하지 않는 항목은 기본값으로 둔다.
 EMPTY_ANALYSIS = {
@@ -853,46 +864,89 @@ def apply_analysis(item, info: dict):
 
 
 def analyze_registered_item(item_id: int):
-    """등록된 습득물 사진을 분석해서 비어 있는 칸만 채우고 상태를 registered로 바꾼다."""
+    """
+    등록 후 백그라운드 작업 (물품 하나).
+
+    1) status=analyzing이면 등록 분석으로 비어 있는 칸만 채우고 registered로 바꾼다.
+       수동 등록(defer_analysis)은 처음부터 registered라 등록 분석을 부르지 않는다.
+    2) 사진 검색용 임베딩을 계산한다.
+       - baze·mock: Gemini 이미지 임베딩 1회 시도. 실패하면 비워 두고 등록 결과에는 영향 없음
+       - local: 기존 DINOv2 임베딩 (로컬 모델)
+    """
     db = SessionLocal()
     try:
         item = db.query(models.Item).filter(models.Item.id == item_id).first()
-        if item is None or item.status != STATUS_ANALYZING:
+        if item is None:
             return
-
-        try:
-            image_file = resolve_image_path(item.image_path)
-            if image_file is None:
-                raise FileNotFoundError(f"이미지 파일 없음: {item.image_path}")
-            if not item.embedding:
-                # 검색 임베딩은 대표 사진 한 장 기준
-                item.embedding = json.dumps(get_embedding(open_image(image_file)))
-
-            # 등록 분석은 사진 전체(대표 사진 먼저)를 함께 본다
-            analysis_files = [image_file]
-            for extra in item.images or []:
-                extra_file = resolve_image_path(extra.image_path)
-                if extra_file is None:
-                    logger.warning("습득물 #%s 추가 사진 없음: %s", item_id, extra.image_path)
-                elif extra_file not in analysis_files:
-                    analysis_files.append(extra_file)
-
-            # 등록 전에 /items/analyze 결과를 이미 반영했다면(analysis_model 있음) 다시 호출하지 않는다
-            if item.analysis_model is None:
-                info = extract_item_info([open_image(f) for f in analysis_files])
-                apply_analysis(item, info)
-            item.status = STATUS_REGISTERED
-        except AnalyzerConfigError as exc:
-            # API 키 누락 등 설정 문제: 스택트레이스 대신 해결 방법이 담긴 메시지만 남긴다
-            logger.error("습득물 #%s 자동 분석 불가: %s", item_id, exc)
-            item.status = STATUS_ANALYSIS_FAILED
-        except Exception:
-            logger.exception("습득물 #%s 자동 분석 실패", item_id)
-            item.status = STATUS_ANALYSIS_FAILED
-
-        db.commit()
+        if item.status == STATUS_ANALYZING:
+            _run_registration_analysis(db, item)
+        if item.status != STATUS_ANALYSIS_FAILED:
+            _store_search_embedding(db, item)
     finally:
         db.close()
+
+
+def _store_search_embedding(db, item):
+    image_file = resolve_image_path(item.image_path)
+    if image_file is None:
+        logger.warning("습득물 #%s 검색 임베딩 생략: 대표 사진 없음", item.id)
+        return
+
+    if _embedder is None:  # local
+        if not item.embedding:
+            try:
+                item.embedding = json.dumps(get_embedding(open_image(image_file)))
+                db.commit()
+            except Exception:
+                db.rollback()
+                logger.exception("습득물 #%s DINOv2 임베딩 실패", item.id)
+        return
+
+    if item.image_embedding_gemini and item.image_embedding_model == _embedder.model_id:
+        return
+    try:
+        vector = _embedder.embed_images([open_image(image_file)])[0]
+    except Exception as exc:
+        # 1회만 시도하고 비워 둔다. 사진 검색에서는 남은 자리를 명세 순서로 채울 때 들어간다
+        db.rollback()
+        logger.warning("습득물 #%s 사진 임베딩 실패 (비워 둠): %s", item.id, exc)
+        return
+    item.image_embedding_gemini = json.dumps(vector)
+    item.image_embedding_model = _embedder.model_id
+    db.commit()
+
+
+def _run_registration_analysis(db, item):
+    """등록 분석으로 비어 있는 칸만 채운다. 실패하면 analysis_failed (검색 대상에서 빠짐)."""
+    item_id = item.id
+    try:
+        image_file = resolve_image_path(item.image_path)
+        if image_file is None:
+            raise FileNotFoundError(f"이미지 파일 없음: {item.image_path}")
+
+        # 등록 분석은 사진 전체(대표 사진 먼저)를 함께 본다
+        analysis_files = [image_file]
+        for extra in item.images or []:
+            extra_file = resolve_image_path(extra.image_path)
+            if extra_file is None:
+                logger.warning("습득물 #%s 추가 사진 없음: %s", item_id, extra.image_path)
+            elif extra_file not in analysis_files:
+                analysis_files.append(extra_file)
+
+        # 등록 전에 /items/analyze 결과를 이미 반영했다면(analysis_model 있음) 다시 호출하지 않는다
+        if item.analysis_model is None:
+            info = extract_item_info([open_image(f) for f in analysis_files])
+            apply_analysis(item, info)
+        item.status = STATUS_REGISTERED
+    except AnalyzerConfigError as exc:
+        # API 키 누락 등 설정 문제: 스택트레이스 대신 해결 방법이 담긴 메시지만 남긴다
+        logger.error("습득물 #%s 자동 분석 불가: %s", item_id, exc)
+        item.status = STATUS_ANALYSIS_FAILED
+    except Exception:
+        logger.exception("습득물 #%s 자동 분석 실패", item_id)
+        item.status = STATUS_ANALYSIS_FAILED
+
+    db.commit()
 
 
 def backfill_missing_embeddings():
@@ -928,10 +982,13 @@ def backfill_missing_embeddings():
 
 def _analysis_worker():
     # 모델을 한 스레드에서만 쓰도록 분석 작업 전에 같은 스레드에서 처리한다
-    try:
-        backfill_missing_embeddings()
-    except Exception:
-        logger.exception("검색 임베딩 재계산 작업 오류")
+    # baze·mock 검색에서는 로컬 모델(DINOv2)을 불러오지 않으므로 건너뛴다.
+    # Gemini 임베딩 백필은 자동 실행하지 않는다 (tools/backfill_gemini_embeddings.py)
+    if SEARCH_ANALYZER_MODE == "local":
+        try:
+            backfill_missing_embeddings()
+        except Exception:
+            logger.exception("검색 임베딩 재계산 작업 오류")
 
     while True:
         item_id = _analysis_queue.get()
@@ -1001,7 +1058,9 @@ def health_check():
             if REGISTRATION_ANALYZER_MODE == "baze"
             else None
         ),
-        "search_workflow": "LangGraph",
+        "search_analyzer_mode": SEARCH_ANALYZER_MODE,
+        "search_embedding_model": _embedder.model_id if _embedder is not None else MODEL_NAME,
+        "search_workflow": "LangGraph" if SEARCH_ANALYZER_MODE == "local" else "embedding+gemini-compare",
     }
 
 
@@ -1132,12 +1191,17 @@ async def register_item(
     occurred_at: str = Form(None),
     analysis_id: str = Form(None),              # /items/analyze 응답의 analysis_id (선택)
     form_answers: str = Form(None),             # 체크 폼에서 사람이 고른 값 {"color": "검정", ...} (JSON)
+    defer_analysis: str = Form(None),           # true: 등록 분석을 부르지 않고 직접 입력값으로 바로 registered
     image: UploadFile = File(...),                        # 대표 사진
     extra_images: list[UploadFile] | None = File(None),   # 같은 물품의 다른 각도 사진 (선택)
     db: Session = Depends(get_db),
 ):
     if item_type not in {"found", "lost"}:
         raise HTTPException(status_code=400, detail="item_type must be 'found' or 'lost'")
+
+    deferred = labels.parse_optional_bool(defer_analysis)
+    if defer_analysis not in (None, "") and deferred is None:
+        raise HTTPException(status_code=400, detail="defer_analysis는 true 또는 false여야 합니다.")
 
     normalized_level = labels.normalize_identification_level(identification_level)
     if identification_level and normalized_level is None:
@@ -1211,7 +1275,8 @@ async def register_item(
         image_path=saved_path,
         location=location,
         occurred_at=parse_optional_datetime(occurred_at),
-        status=STATUS_ANALYZING,
+        # 수동 등록은 등록 분석을 부르지 않으므로 바로 registered (검색·목록 대상)
+        status=STATUS_REGISTERED if deferred else STATUS_ANALYZING,
         images=[
             models.ItemImage(image_path=path, position=position)
             for position, path in enumerate(saved_paths)
@@ -1233,7 +1298,8 @@ async def register_item(
     db.commit()
     db.refresh(new_item)
 
-    # 검색 임베딩 계산 (분석 결과가 없으면 AI 분석도 함께)
+    # 백그라운드: 등록 분석(analyzing일 때만) + 사진 검색 임베딩 1회 시도.
+    # 수동 등록도 임베딩은 시도한다 (등록 분석 호출은 0회, 임베딩 실패는 등록 결과에 영향 없음)
     _analysis_queue.put(new_item.id)
 
     return serialize_item(new_item)
@@ -1297,7 +1363,208 @@ async def search_items(
     filters: str = Form(None),    # 체크 폼에서 분실자가 고른 값 {"color": "검정", ...} (JSON)
     db: Session = Depends(get_db),
 ):
+    """분실물 검색. FINDYU_SEARCH_ANALYZER_MODE에 따라 게이트웨이(baze·mock) 또는 기존 로컬 검색(local)."""
+    if SEARCH_ANALYZER_MODE == "local":
+        return await _local_search(
+            description=description, location=location, occurred_at=occurred_at, image=image,
+            top_k=top_k, category=category, filters=filters, db=db,
+        )
+    return await _gateway_search(
+        description=description, location=location, occurred_at=occurred_at, image=image,
+        top_k=top_k, category=category, filters=filters, db=db,
+    )
+
+
+# 구형 점수 필드: 게이트웨이 검색에서는 값을 채우지 않고 전환 기간 동안 null로만 둔다 (docs/API.md)
+LEGACY_SCORE_FIELDS = (
+    "similarity_score", "matching_score", "similarity",
+    "image_similarity", "text_similarity", "location_score", "time_score",
+)
+GATEWAY_TOP_K_MAX = 5
+
+
+def _load_candidate_jpeg(item) -> bytes | None:
+    """후보 대표 사진 → 비교용 JPEG 바이트. 읽을 수 없으면 None."""
+    image_file = resolve_image_path(item.image_path)
+    if image_file is None:
+        return None
+    try:
+        return search_adapter.to_jpeg(open_image(image_file))
+    except Exception:
+        logger.warning("습득물 #%s 대표 사진을 읽을 수 없음: %s", item.id, item.image_path)
+        return None
+
+
+def _gateway_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, AnalyzerConfigError):
+        return HTTPException(status_code=503, detail=str(exc))
+    return HTTPException(status_code=502, detail=str(exc))
+
+
+async def _gateway_search(*, description, location, occurred_at, image, top_k, category, filters, db):
     """
+    게이트웨이 검색 (공통 명세 4절).
+    1) 체크 폼 필터 (일치·미확인 규칙과 total_candidates 의미는 로컬 검색과 같음)
+    2) 비교 후보 최대 10건
+       - 사진 검색: 저장된 사진 임베딩 유사도 상위 → 남은 자리는 명세 순서 (장소 일치 → 시각 근접 → 최신)
+       - 자연어 검색: 명세 순서
+    3) 검색 비교 어댑터 한 번 → ID 검증 → DB 레코드와 결합, Top-5 이내
+    후보가 없으면 AI를 부르지 않고 200과 빈 results.
+    """
+    started = time.perf_counter()
+    timings = {}
+    top_k = max(1, min(int(top_k), GATEWAY_TOP_K_MAX))
+
+    try:
+        filter_category, form_filters = check_form.parse_filters(category, filters)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    query_image = None
+    if image is not None and image.filename:
+        image_bytes = await image.read()
+        if image_bytes:
+            try:
+                query_image = open_image(io.BytesIO(image_bytes))
+                query_image.load()
+            except Exception as exc:
+                raise HTTPException(status_code=400, detail="invalid search image") from exc
+
+    text = (description or "").strip() or None
+    query_location = (location or "").strip() or None
+    query_time = parse_optional_datetime(occurred_at)
+    kind = "image" if query_image is not None else ("text" if text else "filter_only")
+
+    all_candidates = (
+        db.query(models.Item)
+        .filter(models.Item.item_type == "found")
+        .filter(models.Item.status != STATUS_ANALYSIS_FAILED)
+        .all()
+    )
+    filter_checks = {}
+    candidates = []
+    for item in all_candidates:
+        checked = check_form.match_filters(item, filter_category, form_filters)
+        if checked is not None:
+            filter_checks[item.id] = checked
+            candidates.append(item)
+
+    selected = []  # [(item, source, embedding_score, jpeg)]
+    ranked = []    # [{"id", "match_reasons"}]
+    if candidates and kind == "image":
+        query_vector = None
+        has_embeddings = any(
+            search_candidates.stored_embedding(item, _embedder.model_id) is not None
+            for item in candidates
+        )
+        if has_embeddings:
+            t0 = time.perf_counter()
+            try:
+                query_vector = await run_in_threadpool(_embedder.embed_images, [query_image])
+            except (AnalyzerConfigError, AnalyzerError) as exc:
+                raise _gateway_error(exc) from exc
+            finally:
+                timings["embedding_ms"] = round((time.perf_counter() - t0) * 1000)
+            query_vector = query_vector[0]
+        if query_vector is not None:
+            ordered = search_candidates.image_search_order(
+                candidates, query_vector, _embedder.model_id, query_location, query_time
+            )
+        else:
+            ordered = [
+                (item, search_candidates.SOURCE_ORDER, None)
+                for item in search_candidates.spec_order(candidates, query_location, query_time)
+            ]
+        selected = search_candidates.take_readable(
+            ordered, _load_candidate_jpeg, search_adapter.MAX_CANDIDATES, require_image=True
+        )
+    elif candidates and kind == "text":
+        ordered = [
+            (item, search_candidates.SOURCE_ORDER, None)
+            for item in search_candidates.spec_order(candidates, query_location, query_time)
+        ]
+        selected = search_candidates.take_readable(
+            ordered, _load_candidate_jpeg, search_adapter.MAX_CANDIDATES, require_image=False
+        )
+    elif candidates:  # 사진·설명 없이 필터만: AI를 부르지 않고 명세 순서
+        ranked = [
+            {"id": item.id, "match_reasons": []}
+            for item in search_candidates.spec_order(candidates, query_location, query_time)[:top_k]
+        ]
+
+    if selected:
+        query = search_adapter.SearchQuery(
+            kind=kind,
+            text=text,
+            image_jpeg=search_adapter.to_jpeg(query_image) if query_image is not None else None,
+            location=query_location,
+            occurred_at=query_time.isoformat(timespec="minutes") if query_time else None,
+        )
+        compare_candidates = [
+            search_adapter.SearchCandidate(
+                id=item.id,
+                category=item.category,
+                description=item.description,
+                form_values=check_form.item_form_values(item),
+                location=item.location,
+                occurred_at=item.occurred_at.isoformat(timespec="minutes") if item.occurred_at else None,
+                image_jpeg=jpeg,
+            )
+            for item, _source, _score, jpeg in selected
+        ]
+        t0 = time.perf_counter()
+        try:
+            ranked = await run_in_threadpool(
+                search_adapter.compare, SEARCH_ANALYZER_MODE, query, compare_candidates
+            )
+        except (AnalyzerConfigError, AnalyzerError) as exc:
+            raise _gateway_error(exc) from exc
+        finally:
+            timings["compare_ms"] = round((time.perf_counter() - t0) * 1000)
+
+    by_id = {item.id: item for item in candidates}
+    source_by_id = {item.id: source for item, source, _score, _jpeg in selected}
+    results = []
+    for rank, row in enumerate(ranked[:top_k], start=1):
+        item = by_id[row["id"]]
+        results.append({
+            **serialize_item(item),
+            **{field: None for field in LEGACY_SCORE_FIELDS},
+            "rank": rank,
+            "match_reasons": row["match_reasons"],
+            "filter_check": filter_checks.get(item.id, {}),
+            "selection_source": source_by_id.get(item.id, search_candidates.SOURCE_ORDER),
+        })
+
+    timings["total_ms"] = round((time.perf_counter() - started) * 1000)
+    return {
+        "query_description": description,
+        "query_location": query_location,
+        "query_occurred_at": occurred_at,
+        "search_kind": kind,
+        "search_analyzer_mode": SEARCH_ANALYZER_MODE,
+        "embedding_model": _embedder.model_id if kind == "image" else None,
+        "applied_filters": {
+            **({"category": filter_category} if filter_category else {}),
+            **{fld.key: fld.choice_from_column(value) or value for fld, value in form_filters},
+        },
+        "total_found_items": len(all_candidates),
+        "total_candidates": len(candidates),
+        "evaluated_count": len(selected),
+        "selection": {
+            "by_embedding": sum(1 for _i, s, _sc, _j in selected if s == search_candidates.SOURCE_EMBEDDING),
+            "by_order": sum(1 for _i, s, _sc, _j in selected if s == search_candidates.SOURCE_ORDER),
+        },
+        "timings": timings,
+        "results": results,
+    }
+
+
+async def _local_search(
+    *, description, location, occurred_at, image, top_k, category, filters, db,
+):
+    """
+    (FINDYU_SEARCH_ANALYZER_MODE=local) 기존 로컬 모델 검색.
     AI 브랜치의 핵심 검색 구조를 demo FastAPI/SQLite에 통합.
 
     체크 폼 필터: 분실자가 체크한 항목(category, filters)과 값이 다른 습득물은 후보에서 뺀다.

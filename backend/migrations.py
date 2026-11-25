@@ -178,6 +178,18 @@ def _m7_check_form_columns(conn: sqlite3.Connection):
     logger.warning("기타 → 이어폰 재분류: %s", moved or "없음")
 
 
+# v8에서 추가한 컬럼: 사진 검색용 Gemini 이미지 임베딩과 그 모델
+V8_COLUMNS = [
+    ("image_embedding_gemini", "TEXT"),
+    ("image_embedding_model", "VARCHAR"),
+]
+
+
+def _m8_gemini_image_embedding(conn: sqlite3.Connection):
+    """기존 물품은 비워 둔다. 채우려면 tools/backfill_gemini_embeddings.py를 직접 실행 (자동 실행 안 함)."""
+    _add_columns(conn, V8_COLUMNS)
+
+
 MIGRATIONS = [
     (1, _m1_add_phone_wallet_columns),
     (2, _m2_normalize_image_paths),
@@ -186,6 +198,7 @@ MIGRATIONS = [
     (5, _m5_create_item_images),
     (6, _m6_clear_rotated_embeddings),
     (7, _m7_check_form_columns),
+    (8, _m8_gemini_image_embedding),
 ]
 LATEST_VERSION = MIGRATIONS[-1][0]
 
